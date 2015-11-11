@@ -3,7 +3,7 @@ Build:
     make
 
 Run
-    ./c2ibniz <file.ibc>
+    ./c2ibniz \<file.ibc\>
 
 #File Spec
 
