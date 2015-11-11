@@ -1,0 +1,10 @@
+
+int ibniz_run(int t, int x, int y) {
+ if (x != y) {
+ 	return (x^y)+sin(t);
+ } else {
+
+}
+
+ return 5;
+}

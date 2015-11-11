@@ -1,0 +1,5 @@
+
+int ibniz_run(const int time, const int x, const int y) {
+
+ return 5*sin(time/99) + x^y + x%y;
+}
