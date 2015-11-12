@@ -15,4 +15,9 @@ int main(int argc, char** argv) {
         std::cout << " ";
     }
     std::cout << std::endl;
+    
+    ASTNode* ast = parse(tokens);
+    if (!ast) std::cout << "PARSE FAILED" << std::endl;
+    
+    if (ast) std::cout << "PARSE SUCCEEDED?" << std::endl;
 }

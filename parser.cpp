@@ -1,11 +1,23 @@
 #include "parser.h"
 
 /*helpful macros. Note that START_PARSE can't be wrapped, since we want to declare in scope.*/
-#define START_PARSE(X) auto old_it = it; X *node = new X();
+#define START_PARSE(X) auto old_it = it; X *node = new X(); std::cout<<"Starting parse " << ASTtypenames[node->type] << std::endl;
 #define FAIL_PARSE do {it = old_it; delete node; return nullptr;} while(0);
-#define READ_OF_TYPE(X) do { if (!check_next(tokens,it,X)) {FAIL_PARSE;}; it++;} while(0);
-#define READ_TEXT(X) do { if (!check_next_text(tokens,it,X)) {FAIL_PARSE;}; it++;} while(0);
+#define PARSE_ERR(X) do {std::cout<<"FATAL:"<<X<<std::endl;it = old_it; delete node; return nullptr;} while(0);
+#define READ_OF_TYPE(X) do { if (!check_next(tokens,it,X)) {\
+if (it!=tokens.end()&&(it+1)!=tokens.end()) std::cout<<"Wanted type:"<<tokentypenames[X]<<" Got:"<< tokentypenames[(it+1)->type] <<"("<<(it+1)->text<<")" << std::endl;\
+FAIL_PARSE;}; it++;} while(0);
 
+#define READ_TEXT(X) do { \
+if (!check_next_text(tokens,it,X))\
+{\
+if (it!=tokens.end()&&(it+1)!=tokens.end()) std::cout<<"Wanted:"<<X<<" Got:"<< (it+1)->text << std::endl;\
+FAIL_PARSE;};\
+it++;} while(0);
+std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","ENDLINE"};
+std::string ASTtypenames[] = { "FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP", "IF_THEN_ELSE", "RETURN", "NOOP", "ALLOCATE", "UNKNOWN" };
+
+std::string prefix = "";
 void tokenize(std::istream &in, std::vector<token> &out) {
     std::string text;
     while (!in.fail() && !in.eof()) {
@@ -13,7 +25,7 @@ void tokenize(std::istream &in, std::vector<token> &out) {
         token token;
         token.type = IDENT;
         token.text = text;
-        while (text.size() >= 2 && text.front() == '\n') { text.erase(text.begin());};
+        while (!text.empty() && text.front() == '\n') { out.push_back({ENDLINE,"\n"}); text.erase(text.begin());}
         if (text.empty()) continue;
         if (text == "\n" || text == ";\n") token.type = ENDLINE;
         if (text.front() == '%') token.type = VAR;
@@ -47,29 +59,138 @@ bool skipTo(std::vector<token> &tokens, tokIter &it, enum tokentype type) {
     if (it == tokens.end()) return false;
     return true;
 }
+ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it);
+
+ASTNode* parse_literal(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(LiteralNode);
+  //IF WE ADD A "LITERAL" TOKEN TYPE, FIX THIS!
+  READ_OF_TYPE(IDENT);
+  int value = 0;
+  std::string text = it->text;
+  try {
+          value = std::stoi(text);
+          //NOTE: above stoi has some quirks. "123abc" -> 123, even though there is text.
+          //POSSIBLY DO SOME BOUNDS CHECKING?
+          node->value = value;
+          return node;
+  } catch (...) {
+    //stoi exception when it fails.
+    PARSE_ERR(text + " was not any expression?");
+  }
+  return nullptr;
+}
+
+std::string operators[] = {"add","mul","sdiv","srem","sin","sqrt","atan","xor","and","or"};
+bool check_oper(std::string oper) {
+  for (int i = 0; i < 10; i++) {
+    if (operators[i] == oper) return true;
+  }
+  return false;
+}
+
+ASTNode* parse_operation(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(OperNode);
+  READ_OF_TYPE(IDENT);
+  node->oper_name = it->text;
+  if (!check_oper(it->text)) FAIL_PARSE;
+  if (check_next_text(tokens,it,"nsw")) it++;
+  ASTNode* expr = parse_expression(tokens,it);
+  while (expr) {
+    node->operands.push_back(ASTsubtree(expr));
+    expr = parse_expression(tokens,it);
+  }
+  return node;
+}
+  
+
+ASTNode* parse_load(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(LoadNode);
+  READ_TEXT("load");
+  READ_TEXT("at");
+  ASTNode* addr = parse_expression(tokens,it);
+  if (!addr) PARSE_ERR("load had no address?");
+  node->address = ASTsubtree(addr);
+  return node;
+}
+
+ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
+   std::cout<<"Looking for an expr..." << std::endl;
+  if (check_next(tokens,it,ENDLINE)) return nullptr;
+   ASTNode* expr;
+  //check for allocate
+  if (check_next_text(tokens,it,"allocate")) {
+    it++;
+    return new AllocateNode();
+  }
+  //check for load
+  if (check_next_text(tokens,it,"load")) {
+    return parse_load(tokens,it);
+  }
+  //check for a single varn
+  if (check_next(tokens,it,VAR)) {
+    it++;
+    return new ReadNode(it->text);
+  }
+  
+  //try for a operation;
+  expr = parse_operation(tokens,it);
+  if (expr) return expr;
+  //try for a constant
+  return parse_literal(tokens,it);
+}
 
 ASTNode* parse_return(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(ReturnNode);
-    FAIL_PARSE;
+    
+    READ_TEXT("ret");
+    ASTNode* expr = parse_expression(tokens,it);
+    if (!expr) PARSE_ERR("return had no value?");
+    node->value = ASTsubtree(expr);
+    READ_OF_TYPE(ENDLINE);
+    return node;
+    
+    
 }
 
 ASTNode* parse_assignment(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(AssignmentNode);
-    FAIL_PARSE;
+    READ_OF_TYPE(VAR);
+    node->leftside = ASTsubtree(new WriteNode(it->text));
+    READ_OF_TYPE(EQUALS);
+    ASTNode* expr = parse_expression(tokens,it);
+    if (!expr) FAIL_PARSE;
+    node->rightside = ASTsubtree(expr);
+    READ_OF_TYPE(ENDLINE);
+    return node;
 }
 
 ASTNode* parse_store(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(StoreNode);
-    FAIL_PARSE;
+    
+    READ_TEXT("store");
+    ASTNode* expr = parse_expression(tokens,it);
+    if (!expr) PARSE_ERR("store had no value?");
+    node->value = ASTsubtree(expr);
+    READ_TEXT("at");
+    expr = parse_expression(tokens,it);
+    if (!expr) PARSE_ERR("store had no address?");
+    node->address = ASTsubtree(expr);
+    READ_OF_TYPE(ENDLINE);
+    return node;
 }
 
 
 ASTNode* parse_line(std::vector<token> &tokens, tokIter &it) {
+   std::cout<<"Looking for a line..." << std::endl;
    if (it == tokens.end()) return nullptr;
-   if (it->type == ENDLINE) return new NOOPNode();
-   if (it->type == VAR) return parse_assignment(tokens,it);
-   if (it->text == "store") return parse_store(tokens,it);
-   if (it->text == "return") return parse_return(tokens,it);
+   it++;
+   if (it == tokens.end()) {it--;return nullptr;}
+   if (it->type == ENDLINE) { return new NOOPNode();};
+   it--;
+   if (check_next(tokens,it,VAR)) return parse_assignment(tokens,it);
+   if (check_next_text(tokens,it,"store")) return parse_store(tokens,it);
+   if (check_next_text(tokens,it,"ret")) return parse_return(tokens,it);
+   
    return nullptr;
 }
 
@@ -78,14 +199,21 @@ ASTNode* parse_block(std::vector<token> &tokens, tokIter &it) {
     READ_OF_TYPE(OPENBRACE);
     ASTNode* line;
     line = parse_line(tokens,it);
-    FAIL_PARSE;
+    int num = 0;
+    while (line) {
+      std::cout << "BLOCK line " << ++num << std::endl;
+      node->children.push_back(ASTsubtree(line));
+      line = parse_line(tokens,it);
+    }
+    READ_OF_TYPE(CLOSEBRACE);
+    return node;
+      
 }
 
 ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(FuncDefNode);
     
-    if (!check_next_text(tokens,it,"define")) FAIL_PARSE;
-    it++;
+    READ_TEXT("define");
     READ_OF_TYPE(IDENT);
     node->name = it->text;
     
@@ -98,7 +226,7 @@ ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
     
     if (!skipTo(tokens,it,OPENBRACE)) FAIL_PARSE;
     
-    
+    it--;
     ASTNode* body = parse_block(tokens,it);
     if (!body) FAIL_PARSE;
     node->body = ASTsubtree(body);
@@ -106,4 +234,7 @@ ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
 }
 
 ASTNode* parse(std::vector<token> &tokens) {
+  auto it = tokens.begin();
+  tokens.insert(tokens.begin(),{ENDLINE,"DUMMY"});
+  return parse_func_def(tokens,it);
 }
