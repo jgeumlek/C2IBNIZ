@@ -1,7 +1,7 @@
 #include "parser.h"
 
 
-#define PARSE_DEBUG false
+#define PARSE_DEBUG true
 
 /*helpful macros. Note that START_PARSE can't be wrapped, since we want to declare in scope.*/
 #define START_PARSE(X) auto old_it = it; X *node = new X(); if (PARSE_DEBUG) std::cout<<prefix<<"Starting parse " << ASTtypenames[node->type] << std::endl; GO_DOWN;

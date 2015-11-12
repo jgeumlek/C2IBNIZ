@@ -1,3 +1,5 @@
+#ifndef C2I_PARSER_H
+#define C2I_PARSER_H
 #include <iostream>
 #include <vector>
 #include <string>
@@ -159,4 +161,4 @@ public:
     NOOPNode() : ASTNode(NOOP) {};
      virtual std::string to_string() { return "NO OP";};
 };
-
+#endif

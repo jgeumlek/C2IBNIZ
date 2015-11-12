@@ -1,6 +1,6 @@
 #include "parser.h"
 
-
+#include "simplegen.cpp"
 int main(int argc, char** argv) {
     std::vector<token> tokens;
     tokenize(std::cin,tokens);
@@ -22,5 +22,9 @@ int main(int argc, char** argv) {
     
     std::cout << ast->to_string();
     
+    simple_translator *trans = new simple_translator();
+    trans->translate(ast);
+    std::cout << trans->output << std::endl;
     if (ast) delete ast;
+    delete trans;
 }
