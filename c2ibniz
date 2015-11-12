@@ -3,6 +3,8 @@
 #append some declarations for functions present in IBNIZ, and silence warnings from them
 #POSSIBLY: also append the ibniz_run function opening?
 
+mkdir tempfiles 2>/dev/null
+
 cat <<EOF >tempfiles/phase1_prefixed.c
 #pragma clang diagnostic ignored "-Wincompatible-library-redeclaration"
 int sqrt(int);
