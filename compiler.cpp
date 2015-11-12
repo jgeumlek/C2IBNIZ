@@ -2,7 +2,6 @@
 
 
 int main(int argc, char** argv) {
-    FuncDefNode fnode;
     std::vector<token> tokens;
     tokenize(std::cin,tokens);
     for (auto token : tokens) {
@@ -20,4 +19,6 @@ int main(int argc, char** argv) {
     if (!ast) std::cout << "PARSE FAILED" << std::endl;
     
     if (ast) std::cout << "PARSE SUCCEEDED?" << std::endl;
+    
+    if (ast) delete ast;
 }
