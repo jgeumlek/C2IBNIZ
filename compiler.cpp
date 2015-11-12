@@ -20,5 +20,7 @@ int main(int argc, char** argv) {
     
     if (ast) std::cout << "PARSE SUCCEEDED?" << std::endl;
     
+    std::cout << ast->to_string();
+    
     if (ast) delete ast;
 }
