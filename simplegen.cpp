@@ -1,11 +1,10 @@
 #include "parser.h"
 #include <map>
 #include <string>
-
+#define START_STACK_LOC = 2
 struct Variable {
   std::string name;
-  int last_on_stack;
-  int heap_addr;
+  int stackLoc;
 };
 
 typedef std::pair<std::string,Variable> VarEntry;
@@ -19,6 +18,8 @@ public:
    return true;
   };
   
+  int stack_ptr = 0;
+  int stackSize = 0;
   int heap_ptr = 0;
   std::string output = "";
   
@@ -29,11 +30,13 @@ public:
    std::string timevar = func->params.at(0);
    std::string xvar = func->params.at(1);
    std::string yvar = func->params.at(2);
-   vars.insert(VarEntry(timevar,{timevar,-1,0}));
-   vars.insert(VarEntry(xvar,{xvar,-1,4}));
-   vars.insert(VarEntry(yvar,{yvar,-1,8}));
-   heap_ptr = 12;
-   output = "8!4!0!";
+   vars.insert(VarEntry(timevar,{timevar,0}));
+   vars.insert(VarEntry(xvar,{xvar,1}));
+   vars.insert(VarEntry(yvar,{yvar,2}));
+  	 
+   heap_ptr = 0;
+   output = "0,4,8,";
+   stackSize +=3;
    //stack is now empty!
    translate_body(func->body);
   }
@@ -45,18 +48,25 @@ public:
    }
   } 
   void translate_line(ASTsubtree &ast) {
+  stack_ptr = 0;
   if (ast->type == NOOP) return;
   if (ast->type == STORE) { translate_store(ast); return;}
   if (ast->type == ASSIGNMENT) { translate_assignment(ast); return;}
   if (ast->type == RETURN) { translate_return(ast); return;}
   return;  
   };
+
+  void error(std::string log, std::string function) {
+ 	std::cout << "ERROR : " << log << " IN " << function << std::endl; 
+  }
+ 
   void translate_return(ASTsubtree &ast) {
   if (ast->type != RETURN) return;
   ReturnNode* ret = (ReturnNode*) ast.get();
   translate_expr(ret->value);
   return;
   }
+
   void translate_store(ASTsubtree &ast) {
   if (ast->type != STORE) return;
   StoreNode* store = (StoreNode*) ast.get();
@@ -64,35 +74,39 @@ public:
   translate_expr(store->value);
   output += "!";
   }
+  
   void translate_assignment(ASTsubtree &ast) {
   if (ast->type != ASSIGNMENT) return;
   AssignmentNode* line = (AssignmentNode*) ast.get();
   translate_expr(line->rightside);
   translate_write(line->leftside);
   }
+
   void translate_write(ASTsubtree &ast) {
   if (ast->type != WRITE) return;
   WriteNode* write = (WriteNode*) ast.get();
-  int loc = heap_ptr;
+  int loc = 0;
   if (var_allocated(write->varname)) {
     auto it = vars.find(write->varname);
-    loc = it->second.heap_addr;
+    loc = stackSize - it->second.stackLoc - 1;
+    output += std::to_string(loc);
+    output += "("; 
   } else {
-    vars.insert(VarEntry(write->varname,{write->varname,-1,heap_ptr}));
-    heap_ptr += 4;
+      
+    vars.insert(VarEntry(write->varname,{write->varname,stackSize++}));
   }
-  output += std::to_string(loc);
-  output += "!";
   }
+
   void translate_expr(ASTsubtree &ast) {
   if (ast->type == READ) {
     ReadNode* read = (ReadNode*) ast.get();
     auto it = vars.find(read->varname);
-    int loc = it->second.heap_addr;
-    output += std::to_string(loc);
-    output += "@";
+    int loc = stackSize - it->second.stackLoc - 1;
+    output += (std::to_string(loc + stack_ptr) + ")" );
+    stack_ptr++; 
     return;
   }
+
   if (ast->type == LITERAL) {
     LiteralNode* lit = (LiteralNode*) ast.get();
     output += std::to_string(lit->value);
