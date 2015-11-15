@@ -1,10 +1,11 @@
 #include "parser.h"
+#include <cstring>
 
 
-#define PARSE_DEBUG false
+#define PARSE_DEBUG true
 
 /*helpful macros. Note that START_PARSE can't be wrapped, since we want to declare in scope.*/
-#define START_PARSE(X) auto old_it = it; X *node = new X(); if (PARSE_DEBUG) std::cout<<prefix<<"Starting parse " << ASTtypenames[node->type] << std::endl; GO_DOWN;
+#define START_PARSE(X) auto old_it = it; X *node = new X(); if (PARSE_DEBUG) std::cerr<<prefix<<"Starting parse " << ASTtypenames[node->type] << std::endl; GO_DOWN;
 
 std::string prefix  = "";
 #define GO_DOWN if (PARSE_DEBUG)prefix.push_back(' ');
@@ -12,26 +13,36 @@ std::string prefix  = "";
 
 #define FAIL_PARSE do {it = old_it; delete node; GO_UP;return nullptr;} while(0);
 
-#define SUCCEED_PARSE do {GO_UP;if (PARSE_DEBUG)std::cout<<prefix<<"Parse of " << ASTtypenames[node->type] << " suceeded" <<std::endl; return node;} while(0);
+#define SUCCEED_PARSE do {GO_UP;if (PARSE_DEBUG)std::cerr<<prefix<<"Parse of " << ASTtypenames[node->type] << " suceeded" <<std::endl; return node;} while(0);
 
-#define PARSE_ERR(X) do {if (PARSE_DEBUG)std::cout<<"FATAL:"<<X<<std::endl;GO_UP;it = old_it; delete node; return nullptr;} while(0);
+#define PARSE_ERR(X) do {if (PARSE_DEBUG)std::cerr<<"FATAL:"<<X<<std::endl;GO_UP;it = old_it; delete node; return nullptr;} while(0);
 
 #define READ_OF_TYPE(X) do { if (!check_next(tokens,it,X)) {\
 if (it!=tokens.end()&&(it+1)!=tokens.end()) \
-   std::cout<<prefix<<"Wanted type:"<<tokentypenames[X]<<" Got:"<< tokentypenames[(it+1)->type] <<"("<<(it+1)->text<<")" << std::endl;\
+   std::cerr<<prefix<<"Wanted type:"<<tokentypenames[X]<<" Got:"<< tokentypenames[(it+1)->type] <<"("<<(it+1)->text<<")" << std::endl;\
 FAIL_PARSE;}; it++;} while(0);
 
 #define READ_TEXT(X) do { \
 if (!check_next_text(tokens,it,X))\
 {\
 if (it!=tokens.end()&&(it+1)!=tokens.end()) \
-  std::cout<<prefix<<"Wanted:"<<X<<" Got:"<< (it+1)->text << std::endl;\
+  std::cerr<<prefix<<"Wanted:"<<X<<" Got:"<< (it+1)->text << std::endl;\
 FAIL_PARSE;};\
 it++;} while(0);
 
 
-std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","ENDLINE"};
-std::string ASTtypenames[] = { "FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP", "IF_THEN_ELSE", "RETURN", "NOOP", "ALLOCATE", "UNKNOWN" };
+std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","ENDLINE","ENDLINE"};
+std::string ASTtypenames[] = { "FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH" };
+
+//empty string dentes the end of this array
+std::string ignoredwords[] = {"tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone",""};
+
+bool ignoreword(std::string &str) {
+  for (int i = 0; !ignoredwords[i].empty(); i++) {
+    if (str == ignoredwords[i]) return true;
+  }
+  return false;
+}
 
 void tokenize(std::istream &in, std::vector<token> &out) {
     std::string text;
@@ -39,13 +50,18 @@ void tokenize(std::istream &in, std::vector<token> &out) {
         std::getline(in,text,' ');
         token token;
         token.type = IDENT;
-        token.text = text;
         while (!text.empty() && text.front() == '\n') { out.push_back({ENDLINE,"\n"}); text.erase(text.begin());}
+        token.text = text;
+        if (!strncmp(text.c_str(),"<label>:",8)) {
+          token.type = LABEL;
+          token.text = "%"+std::string(text.c_str()+8);
+        }
+        if (ignoreword(text)) continue;
         if (text.empty()) continue;
         if (text == "\n" || text == ";\n") token.type = ENDLINE;
         if (text.front() == '%') token.type = VAR;
-        if (text == "(" || text == "{") token.type = OPENBRACE;
-        if (text == ")" || text == "}") token.type = CLOSEBRACE;
+        if (text == "(" || text == "{" || text == "[") token.type = OPENBRACE;
+        if (text == ")" || text == "}" || text == "]") token.type = CLOSEBRACE;
         if (text == "=") token.type = EQUALS;
         out.push_back(token);
     }
@@ -100,10 +116,10 @@ ASTNode* parse_literal(std::vector<token> &tokens, tokIter &it) {
   }
   return nullptr;
 }
-
-std::string operators[] = {"add","mul","sdiv","srem","sin","sqrt","atan","xor","and","or"};
+//empty string denotes end of array.
+std::string operators[] = {"add","sub","mul","sdiv","srem","sin","sqrt","atan","xor","and","or","ne","eq","ugt","uge","ule","sgt","sge","slt","sle","shl","lshr","ashr",""};
 bool check_oper(std::string oper) {
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; !operators[i].empty(); i++) {
     if (operators[i] == oper) return true;
   }
   return false;
@@ -111,6 +127,8 @@ bool check_oper(std::string oper) {
 
 ASTNode* parse_operation(std::vector<token> &tokens, tokIter &it) {
   START_PARSE(OperNode);
+  //skip icmp, we care about the compare operator itself
+  if (check_next_text(tokens,it,"icmp")) it++;
   READ_OF_TYPE(IDENT);
   node->oper_name = it->text;
   if (!check_oper(it->text)) FAIL_PARSE;
@@ -146,9 +164,26 @@ ASTNode* parse_read(std::vector<token> &tokens, tokIter &it) {
   node->varname = it->text;
   SUCCEED_PARSE;
 }
+ASTNode* parse_phi(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(PhiNode);
+  READ_TEXT("phi");
+  while(check_next(tokens,it,OPENBRACE)) {
+    it++;
+    ASTNode* expr = parse_expression(tokens,it);
+    if (!expr) PARSE_ERR("phi node had a bad value?");
+    if (!check_next(tokens,it,VAR)) { delete expr; PARSE_ERR("phi node had bad predecessor?");}
+    it++;
+    std::string pred = it->text;
+    if (!check_next(tokens,it,CLOSEBRACE)) { delete expr; PARSE_ERR("phi node format...");};
+    it++;
+    node->values.push_back(ASTsubtree(expr));
+    node->source_blocks.push_back(pred);
+  }
+  SUCCEED_PARSE;
+}
 
 ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
-   if (PARSE_DEBUG)std::cout<<prefix<<"Looking for an expr..." << std::endl;
+   if (PARSE_DEBUG)std::cerr<<prefix<<"Looking for an expr..." << std::endl;
   if (check_next(tokens,it,ENDLINE)) return nullptr;
    ASTNode* expr;
   //check for allocate
@@ -158,6 +193,10 @@ ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
   //check for load
   if (check_next_text(tokens,it,"load")) {
     return parse_load(tokens,it);
+  }
+  //check for phi
+  if (check_next_text(tokens,it,"phi")) {
+    return parse_phi(tokens,it);
   }
   //check for a single var
   if (check_next(tokens,it,VAR)) {
@@ -210,6 +249,43 @@ ASTNode* parse_store(std::vector<token> &tokens, tokIter &it) {
     SUCCEED_PARSE;
 }
 
+ASTNode* parse_cond_branch(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(BranchNode);
+  READ_TEXT("br");
+  READ_TEXT("i1");
+  ASTNode* expr = parse_expression(tokens,it);
+  if (!expr) PARSE_ERR("branch had no condition?");
+  node->condition = ASTsubtree(expr);
+  READ_TEXT("label");
+  READ_OF_TYPE(VAR);
+  node->truelabel = it->text;
+  READ_TEXT("label");
+  READ_OF_TYPE(VAR);
+  node->falselabel = it->text;
+  READ_OF_TYPE(ENDLINE);
+  SUCCEED_PARSE;
+}
+ASTNode* parse_jump(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(JumpNode);
+  READ_TEXT("br");
+  READ_TEXT("label");
+  READ_OF_TYPE(VAR);
+  node->label = it->text;
+  READ_OF_TYPE(ENDLINE);
+  SUCCEED_PARSE;
+}
+
+ASTNode* parse_branch(std::vector<token> &tokens, tokIter &it) {
+  if (!check_next_text(tokens,it,"br")) return nullptr;
+  auto it2 = it+1;
+  if (check_next_text(tokens,it2,"label")) {
+    return parse_jump(tokens,it);
+  } else {
+    return parse_cond_branch(tokens,it);
+  }
+
+}
+
 
 ASTNode* parse_line(std::vector<token> &tokens, tokIter &it) {
    if (it == tokens.end()) return nullptr;
@@ -220,8 +296,22 @@ ASTNode* parse_line(std::vector<token> &tokens, tokIter &it) {
    if (check_next(tokens,it,VAR)) return parse_assignment(tokens,it);
    if (check_next_text(tokens,it,"store")) return parse_store(tokens,it);
    if (check_next_text(tokens,it,"ret")) return parse_return(tokens,it);
+   if (check_next_text(tokens,it,"br")) return parse_branch(tokens,it);
    
    return nullptr;
+}
+
+void parse_basic_block_header(std::vector<token> &tokens, tokIter &it, BasicBlockNode* bb) {
+  auto old_it = it;
+  it++;
+  bb->label = it->text;
+  if (check_next_text(tokens,it,"preds")) it++;
+  if (check_next(tokens,it,EQUALS)) it++;
+  while (check_next(tokens,it,VAR)) {
+    it++;
+    bb->preds.push_back(it->text);
+  }
+  return;
 }
 
 ASTNode* parse_block(std::vector<token> &tokens, tokIter &it) {
@@ -230,11 +320,20 @@ ASTNode* parse_block(std::vector<token> &tokens, tokIter &it) {
     ASTNode* line;
     line = parse_line(tokens,it);
     int num = 0;
+    BasicBlockNode* basic_block = new BasicBlockNode();
+    basic_block->label = "%0";
+
     while (line) {
-      if (PARSE_DEBUG) std::cout << prefix << "BLOCK line " << ++num << std::endl;
-      node->children.push_back(ASTsubtree(line));
+      if (PARSE_DEBUG) std::cerr << prefix << "BLOCK line " << ++num << std::endl;
+      basic_block->lines.push_back(ASTsubtree(line));
+      if (check_next(tokens,it,LABEL))  {
+        node->children.push_back(ASTsubtree(basic_block));
+        basic_block = new BasicBlockNode();
+        parse_basic_block_header(tokens,it,basic_block);
+      } 
       line = parse_line(tokens,it);
     }
+    node->children.push_back(ASTsubtree(basic_block));
     READ_OF_TYPE(CLOSEBRACE);
     SUCCEED_PARSE;
       
