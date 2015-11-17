@@ -1,0 +1,5 @@
+int ibniz_run(int time, int x, int y) {
+  int s1 = sin(time>>8);
+  int s2 = sin(((time+0x60)>>8) + 1);
+  return (time>>7) +( ((x*s1) + (y*-s2))^((x*s2)+(y*s1)));
+}

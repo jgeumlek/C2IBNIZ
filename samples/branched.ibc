@@ -1,10 +1,14 @@
 
 int ibniz_run(int t, int x, int y) {
- if (x != y) {
- 	return (x^y)+sin(t);
- } else {
+ 	if (x > y) {
+    return (x^y)+sin(t/500);
+  } else {
+    if (x > 0) {
+    return (x^sqrt(y))+t;
+    } else {
+    return atan(x,y) + sin(t/100)/2;
+    }
+  }
 
-}
 
- return 5;
 }

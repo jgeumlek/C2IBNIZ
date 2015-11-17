@@ -1,0 +1,4 @@
+int ibniz_run(int time, int x, int y) {
+  int wave = sin(time >> 8);
+  return (time >> 8) - ((wave*x)^(wave*y));
+}
