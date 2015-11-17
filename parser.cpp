@@ -26,7 +26,7 @@ FAIL_PARSE;}; it++;} while(0);
 if (!check_next_text(tokens,it,X))\
 {\
 if (it!=tokens.end()&&(it+1)!=tokens.end()) \
-  std::cerr<<prefix<<"Wanted:"<<X<<" Got:"<< (it+1)->text << std::endl;\
+  std::cerr<<prefix<<"Wanted:"<<X<<" Got:\""<< (it+1)->text << "\""<<std::endl;\
 FAIL_PARSE;};\
 it++;} while(0);
 
@@ -35,7 +35,7 @@ std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","E
 std::string ASTtypenames[] = { "FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH" };
 
 //empty string dentes the end of this array
-std::string ignoredwords[] = {"tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone",""};
+std::string ignoredwords[] = {"tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
 
 bool ignoreword(std::string &str) {
   for (int i = 0; !ignoredwords[i].empty(); i++) {
@@ -117,7 +117,7 @@ ASTNode* parse_literal(std::vector<token> &tokens, tokIter &it) {
   return nullptr;
 }
 //empty string denotes end of array.
-std::string operators[] = {"add","sub","mul","sdiv","srem","sin","sqrt","atan","xor","and","or","ne","eq","ugt","uge","ule","sgt","sge","slt","sle","shl","lshr","ashr",""};
+std::string operators[] = {"add","sub","mul","sdiv","srem","sin","sqrt","atan","xor","and","or","ne","eq","ugt","uge","ule","sgt","sge","slt","ult","sle","shl","lshr","ashr",""};
 bool check_oper(std::string oper) {
   for (int i = 0; !operators[i].empty(); i++) {
     if (operators[i] == oper) return true;
@@ -363,7 +363,7 @@ ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
 }
 
 ASTNode* parse(std::vector<token> &tokens) {
-  auto it = tokens.begin();
   tokens.insert(tokens.begin(),{ENDLINE,"DUMMY"});
+  auto it = tokens.begin();
   return parse_func_def(tokens,it);
 }

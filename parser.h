@@ -1,3 +1,5 @@
+#ifndef C2I_PARSER_H
+#define C2I_PARSER_H
 #include <iostream>
 #include <vector>
 #include <string>
@@ -17,7 +19,7 @@ void tokenize(std::istream &in, std::vector<token> &out);
 //We might not end up supporting a lot of these...
 enum ASTtype { FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, RETURN, NOOP, ALLOCATE, UNKNOWN,BASICBLOCK,PHI,JUMP,BRANCH };
 class ASTNode;
-typedef std::unique_ptr<ASTNode> ASTsubtree;
+typedef std::shared_ptr<ASTNode> ASTsubtree;
 ASTNode* parse(std::vector<token> &tokens);
 
 class ASTNode {
@@ -220,3 +222,4 @@ public:
      virtual std::string to_string() { return "NO OP";};
 };
 
+#endif
