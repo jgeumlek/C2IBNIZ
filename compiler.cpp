@@ -1,6 +1,8 @@
 #include "parser.h"
 
 
+#include "heapcodegen.cpp"
+
 int main(int argc, char** argv) {
     std::vector<token> tokens;
     tokenize(std::cin,tokens);
@@ -22,6 +24,11 @@ int main(int argc, char** argv) {
     if (ast) std::cerr << "PARSE SUCCEEDED?" << std::endl;
     
     std::cerr << ast->to_string();
+
+    simple_translator* trans = new simple_translator();
+    trans->translate((ast));
+    std::cout << trans-> output<< std::endl;
+    delete trans;
     
     if (ast) delete ast;
 }
