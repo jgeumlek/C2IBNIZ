@@ -47,9 +47,16 @@ public:
   }
 
 
-  void translate(ASTNode* ast) {
+  void translate(ASTNode* ast) { 
+   if (ast->type != ROOT) return;
+   RootNode* root = (RootNode*) ast;
+   translate_funcdef(root->video_tyx);
+  }
+   
+    
+  void translate_funcdef(ASTsubtree ast) {
    if (ast->type != FUNCTION_DEFINITION) return;
-   FuncDefNode* func = (FuncDefNode*) ast;
+   FuncDefNode* func = (FuncDefNode*) ast.get();
    if (func->name != "@ibniz_run") return;
    std::string timevar = func->params.at(0);
    std::string xvar = func->params.at(1);
