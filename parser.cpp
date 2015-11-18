@@ -35,7 +35,7 @@ std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","E
 std::string ASTtypenames[] = { "ROOT","FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH", };
 
 //empty string dentes the end of this array
-std::string ignoredwords[] = {"tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
+std::string ignoredwords[] = {"i1","tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
 
 bool ignoreword(std::string &str) {
   for (int i = 0; !ignoredwords[i].empty(); i++) {
@@ -312,7 +312,6 @@ ASTNode* parse_store(std::vector<token> &tokens, tokIter &it) {
 ASTNode* parse_cond_branch(std::vector<token> &tokens, tokIter &it) {
   START_PARSE(BranchNode);
   READ_TEXT("br");
-  READ_TEXT("i1");
   ASTNode* expr = parse_expression(tokens,it);
   if (!expr) PARSE_ERR("branch had no condition?");
   node->condition = ASTsubtree(expr);
