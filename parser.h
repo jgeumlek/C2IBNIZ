@@ -93,17 +93,28 @@ public:
     std::vector<ASTsubtree> lines;
     std::string label;
     std::vector<std::string> preds;
+    std::vector<std::string> succs;
+
     virtual std::string to_string() { 
       std::string text;
       text  = "\n---- Basic Block ";
       text += label + " ";
       if (!preds.empty()) {
-        text += "(";
+        text += "in(";
         for (auto pred : preds) {
           text+= pred + ",";
         }
         text += ")";
       }
+
+      if (!succs.empty()) {
+        text += "out(";
+        for (auto succ : succs) {
+          text+= succ + ",";
+        }
+        text += ")";
+      }
+
       text += "----\n";
       for (auto line = lines.begin(); line != lines.end(); line++) {
         text += (*line)->to_string();

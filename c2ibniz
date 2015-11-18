@@ -15,7 +15,7 @@ EOF
 cat $1 >>tempfiles/phase1_prefixed.c
 
 #Use clang to get some LLVM IR
-clang -S -O3 -emit-llvm  tempfiles/phase1_prefixed.c -o tempfiles/phase2_llvm
+clang -S -O3 -emit-llvm -fno-unroll-loops tempfiles/phase1_prefixed.c -o tempfiles/phase2_llvm
 
 #strip out only the ibniz_run function body. If we later support calling subroutines, we'll need to update this.
 #awk '/ibniz_run/,/^}$/' tempfiles/phase2_llvm > tempfiles/phase3_body
