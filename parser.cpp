@@ -32,10 +32,10 @@ it++;} while(0);
 
 
 std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","ENDLINE","ENDLINE"};
-std::string ASTtypenames[] = { "FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH" };
+std::string ASTtypenames[] = { "ROOT","FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH", };
 
 //empty string dentes the end of this array
-std::string ignoredwords[] = {"tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
+std::string ignoredwords[] = {"i1","tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
 
 bool ignoreword(std::string &str) {
   for (int i = 0; !ignoredwords[i].empty(); i++) {
@@ -44,28 +44,70 @@ bool ignoreword(std::string &str) {
   return false;
 }
 
-void tokenize(std::istream &in, std::vector<token> &out) {
-    std::string text;
-    while (!in.fail() && !in.eof()) {
-        std::getline(in,text,' ');
+char delim[] = {'{','}',' ',',',';','(',')','[',']','\0'};
+
+bool isDelim(char c) {
+    for (int i = 0; delim[i];i++)
+        if (c == delim[i]) return true;
+    return false;
+}
+
+void check_for_token(std::string &str, std::vector<token> &out) {
+    std::string word = str;
+    str.clear();
+    if (word.empty()) return;
+    if (word.front() == '#') return;
+    if (ignoreword(word)) return;
+    
+    if (!strncmp(word.c_str(),"<label>:",8)) {
         token token;
-        token.type = IDENT;
-        while (!text.empty() && text.front() == '\n') { out.push_back({ENDLINE,"\n"}); text.erase(text.begin());}
-        token.text = text;
-        if (!strncmp(text.c_str(),"<label>:",8)) {
-          token.type = LABEL;
-          token.text = "%"+std::string(text.c_str()+8);
-        }
-        if (ignoreword(text)) continue;
-        if (text.empty()) continue;
-        if (text == "\n" || text == ";\n") token.type = ENDLINE;
-        if (text.front() == '%') token.type = VAR;
-        if (text == "(" || text == "{" || text == "[") token.type = OPENBRACE;
-        if (text == ")" || text == "}" || text == "]") token.type = CLOSEBRACE;
-        if (text == "=") token.type = EQUALS;
+        token.type = LABEL;
+        token.text = "%" + std::string(word.c_str()+8);
         out.push_back(token);
+        return;
+    }
+    if (word.front() == '%') {
+        out.push_back({VAR,word});
+        return;
+    }
+    if (word == "=") {
+        out.push_back({EQUALS,word});
+        return;
+    }
+    out.push_back({IDENT,word});
+    word.clear();
+}
+
+void check_for_delim(char c, std::vector<token> &out) {
+    if (c == '(' || c == '{' || c == '[') out.push_back({OPENBRACE,"{"});
+    if (c == ')' || c == '}' || c == ']') out.push_back({CLOSEBRACE,"}"});
+}
+    
+    
+
+void tokenize(std::istream &in, std::vector<token> &out) {
+    std::string line;
+    bool seen_definition = false;
+    while(!in.fail() && !in.eof()) {
+        std::getline(in,line,'\n');
+        std::string word;
+        for (char c : line) {
+            if (isDelim(c)) {
+                if (!seen_definition && word == "define") seen_definition = true;
+                if (!seen_definition) break;
+                if (word == "attributes") break;
+                check_for_token(word,out);
+                check_for_delim(c,out);
+            } else {
+            if (c != '\n') word.push_back(c);
+            }
+        }
+        if (seen_definition) check_for_token(word,out);
+        out.push_back({ENDLINE,"\n"});
     }
 }
+
+
 
 typedef std::vector<token>::iterator tokIter;
 
@@ -181,7 +223,21 @@ ASTNode* parse_phi(std::vector<token> &tokens, tokIter &it) {
   }
   SUCCEED_PARSE;
 }
-
+ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
+    START_PARSE(CallNode);
+    READ_TEXT("call");
+    READ_OF_TYPE(IDENT);
+    node->func_name = it->text;
+    READ_OF_TYPE(OPENBRACE);
+    while(!check_next(tokens,it,CLOSEBRACE)) {
+        ASTNode* expr = parse_expression(tokens,it);
+        if (!expr) PARSE_ERR("call had a bad argument?");
+        node->params.push_back(ASTsubtree(expr));
+    }
+    READ_OF_TYPE(CLOSEBRACE);
+    SUCCEED_PARSE;
+}
+        
 ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
    if (PARSE_DEBUG)std::cerr<<prefix<<"Looking for an expr..." << std::endl;
   if (check_next(tokens,it,ENDLINE)) return nullptr;
@@ -197,6 +253,10 @@ ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
   //check for phi
   if (check_next_text(tokens,it,"phi")) {
     return parse_phi(tokens,it);
+  }
+  //check for call
+  if (check_next_text(tokens,it,"call")) {
+    return parse_call(tokens,it);
   }
   //check for a single var
   if (check_next(tokens,it,VAR)) {
@@ -252,7 +312,6 @@ ASTNode* parse_store(std::vector<token> &tokens, tokIter &it) {
 ASTNode* parse_cond_branch(std::vector<token> &tokens, tokIter &it) {
   START_PARSE(BranchNode);
   READ_TEXT("br");
-  READ_TEXT("i1");
   ASTNode* expr = parse_expression(tokens,it);
   if (!expr) PARSE_ERR("branch had no condition?");
   node->condition = ASTsubtree(expr);
@@ -361,9 +420,29 @@ ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
     node->body = ASTsubtree(body);
     SUCCEED_PARSE;
 }
-
+std::string getFuncName(ASTNode* node) {
+    if (node->type != FUNCTION_DEFINITION) return "";
+    FuncDefNode* def = (FuncDefNode*) node;
+    return def->name;
+}
 ASTNode* parse(std::vector<token> &tokens) {
   tokens.insert(tokens.begin(),{ENDLINE,"DUMMY"});
   auto it = tokens.begin();
-  return parse_func_def(tokens,it);
+  RootNode* root = new RootNode();
+  while (it != tokens.end()) {
+    while ( it != tokens.end() && !it->text.empty() && it->text != "define") it++;
+    ASTNode* func = parse_func_def(tokens,--it);
+    if (func) {
+        std::string name = getFuncName(func);
+        if (name == "@ibniz_run") {
+            root->video_tyx = ASTsubtree(func);
+        } else {
+            root->subroutines.push_back(ASTsubtree(func));
+        }
+    } else {
+     it++;
+    }
+  }
+  
+  return root;
 }
