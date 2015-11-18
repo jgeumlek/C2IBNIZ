@@ -17,7 +17,7 @@ struct token {
 void tokenize(std::istream &in, std::vector<token> &out);
 
 //We might not end up supporting a lot of these...
-enum ASTtype { FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, RETURN, NOOP, ALLOCATE, UNKNOWN,BASICBLOCK,PHI,JUMP,BRANCH };
+enum ASTtype { ROOT,FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, RETURN, NOOP, ALLOCATE, UNKNOWN,BASICBLOCK,PHI,JUMP,BRANCH};
 class ASTNode;
 typedef std::shared_ptr<ASTNode> ASTsubtree;
 ASTNode* parse(std::vector<token> &tokens);
@@ -29,6 +29,27 @@ public:
     ASTNode(enum ASTtype type) : type(type) {};
     virtual ~ASTNode() {};
     virtual std::string to_string() { return "UNKNOWN NODE";};
+};
+
+class RootNode : public ASTNode {
+public:
+    RootNode() : ASTNode(ROOT) {};
+    ASTsubtree video_tyx;
+    ASTsubtree video_t;
+    ASTsubtree audio;
+    std::vector<ASTsubtree> subroutines; 
+    virtual std::string to_string() { 
+      std::string text;
+      text = "\n====Our Main Func====\n";
+      text += video_tyx->to_string();
+      text += "\n=====End Main Func====\n";
+      for (auto func : subroutines) {
+        text  += "\n=========================\n";
+        text += func->to_string();
+        text += "\n=========================\n";
+      }
+      return text;
+    };
 };
 
 class FuncDefNode : public ASTNode {
@@ -154,8 +175,8 @@ public:
     virtual std::string to_string() { 
       std::string text;
       text  = "call " + func_name + "(";
-      for (auto var = params.begin(); var != params.end(); var++) {
-        text += (*var)->to_string();
+      for (auto var : params) {
+        text += var->to_string();
         text += ",";
       }
       text += ")";
