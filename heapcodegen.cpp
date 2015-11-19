@@ -185,7 +185,7 @@ public:
   }
   if (ast->type == LITERAL) {
     LiteralNode* lit = (LiteralNode*) ast.get();
-    output += std::to_string(lit->value) + ",";
+    output += (lit->hexprint()) + ",";
     return;
   }
   if (ast->type == ALLOCATE) {
