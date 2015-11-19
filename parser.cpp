@@ -35,7 +35,7 @@ std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","E
 std::string ASTtypenames[] = { "ROOT","FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH", };
 
 //empty string dentes the end of this array
-std::string ignoredwords[] = {"i1","tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
+std::string ignoredwords[] = {"i1","exact","tail","notail","musttail","zeroext","signext","inreg","void","noreturn","nounwind","readonly","readnone","nuw","nsw",""};
 
 bool ignoreword(std::string &str) {
   for (int i = 0; !ignoredwords[i].empty(); i++) {
@@ -235,7 +235,7 @@ ASTNode* parse_phi(std::vector<token> &tokens, tokIter &it) {
     if (!check_next(tokens,it,CLOSEBRACE)) { delete expr; PARSE_ERR("phi node format...");};
     it++;
     node->values.push_back(ASTsubtree(expr));
-    node->source_blocks.push_back(pred);
+    node->source_blocks.push_back(current_function+pred);
   }
   SUCCEED_PARSE;
 }

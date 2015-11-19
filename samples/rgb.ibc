@@ -1,0 +1,21 @@
+int rgb(int r, int g, int b) {
+   int wr = frac(.299)*r;
+   int wg = frac(.587)*g;
+   int wb = frac(.114)*b;
+   int y = wr + wb + wg;
+   int u = frac(.492)*(b-y);//frac(1.1287)*(b-y);
+   int v = frac(.877)*(r-y);//frac(1.4265)*(r-y);
+   u <<= 15;
+   v <<= 15;
+   u &= fixed16(0xFF00,0);
+   v &= fixed16(0xFF00,0);
+   
+   return v | (u >> 8) | y;
+}
+
+int ibniz_run(int time,int x, int y) {
+   //return rgb(1,0,1);
+  time >>= 10;
+  //return rgb((sin(x)+1)/2,(sin(y)+1)/2,(sin(time)+1)/2);
+ return rgb(((x^y)+1)/2,(sin(time+sqrt(x*x+y*y))+1)/2,(-atan(y,x)+frac(.5)+time)%frac(1));
+}
