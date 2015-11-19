@@ -235,7 +235,7 @@ ASTNode* parse_phi(std::vector<token> &tokens, tokIter &it) {
     if (!check_next(tokens,it,CLOSEBRACE)) { delete expr; PARSE_ERR("phi node format...");};
     it++;
     node->values.push_back(ASTsubtree(expr));
-    node->source_blocks.push_back(pred);
+    node->source_blocks.push_back(current_function+pred);
   }
   SUCCEED_PARSE;
 }
