@@ -93,17 +93,28 @@ public:
     std::vector<ASTsubtree> lines;
     std::string label;
     std::vector<std::string> preds;
+    std::vector<std::string> succs;
+
     virtual std::string to_string() { 
       std::string text;
       text  = "\n---- Basic Block ";
       text += label + " ";
       if (!preds.empty()) {
-        text += "(";
+        text += "in(";
         for (auto pred : preds) {
           text+= pred + ",";
         }
         text += ")";
       }
+
+      if (!succs.empty()) {
+        text += "out(";
+        for (auto succ : succs) {
+          text+= succ + ",";
+        }
+        text += ")";
+      }
+
       text += "----\n";
       for (auto line = lines.begin(); line != lines.end(); line++) {
         text += (*line)->to_string();
@@ -224,12 +235,28 @@ public:
     std::string varname;
     virtual std::string to_string() { return "writevar_" + varname;};
 };
+
 class LiteralNode : public ASTNode {
 public:
     LiteralNode() : ASTNode(LITERAL) {};
     LiteralNode(int value) : ASTNode(LITERAL), value(value) {};
+    static std::string format(int value) {
+        if (value == 0) return "0";
+        int whole = (value >> 16) & 0x0000FFFF;
+        int frac = (value & 0x0000FFFF); 
+        size_t size = snprintf(nullptr,0,"%.4X.%.4X",whole,frac) + 1;
+        std::unique_ptr<char[]> buffer(new char[size]);
+        snprintf(buffer.get(),size,"%.4X.%.4X",whole,frac);
+        char* start = buffer.get();
+        char* end = buffer.get()+size-2;
+        while(*start == '0') start++;
+        while(*end == '0') end--;
+        if (*end != '.') end++;
+        return std::string(start,end);
+    }
+    std::string hexprint() { return format(value);};
     int value;
-    virtual std::string to_string() { return "lit_" + std::to_string(value);};
+    virtual std::string to_string() { return "lit_" + format(value);};
 };
 class AllocateNode : public ASTNode {
 public:

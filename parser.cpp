@@ -117,6 +117,10 @@ typedef std::vector<token>::iterator tokIter;
  * At the end of the parse, the iterator points to the last read token.
  */
 
+/*Awful icky globals, instead of actually passing this information down.*/
+std::string current_function = "";
+BasicBlockNode* current_block = nullptr;
+
 bool check_next(std::vector<token> &tokens, tokIter &it, enum tokentype type) {
     if (it == tokens.end()) return false;
     it++;
@@ -147,10 +151,18 @@ ASTNode* parse_literal(std::vector<token> &tokens, tokIter &it) {
   int value = 0;
   std::string text = it->text;
   try {
+       if (text != "double") throw 1;
+       if (!check_next(tokens,it,IDENT)) throw 1;
+       it++; text = it->text;
+       double dvalue = std::stod(text);
+       node->value = (int) (dvalue * (1 << 16));
+       SUCCEED_PARSE;
+  } catch(...) {};
+  try {
           value = std::stoi(text);
           //NOTE: above stoi has some quirks. "123abc" -> 123, even though there is text.
           //POSSIBLY DO SOME BOUNDS CHECKING?
-          node->value = value;
+          node->value = value<<16;
           SUCCEED_PARSE;
   } catch (...) {
     //stoi exception when it fails.
@@ -179,6 +191,10 @@ ASTNode* parse_operation(std::vector<token> &tokens, tokIter &it) {
   while (expr) {
     node->operands.push_back(ASTsubtree(expr));
     expr = parse_expression(tokens,it);
+  }
+  if (node->oper_name == "xor" && node->operands.back()->to_string() == "lit_-1") {
+    node->oper_name = "complement";
+    node->operands.erase(node->operands.end()-1);
   }
   SUCCEED_PARSE;
 }
@@ -223,6 +239,34 @@ ASTNode* parse_phi(std::vector<token> &tokens, tokIter &it) {
   }
   SUCCEED_PARSE;
 }
+ASTNode* handle_builtins(CallNode* call) {
+/*This function translates function calls into operators,
+  since IBNIZ provides a few for us*/
+    if (call->func_name == "sin" || call->func_name == "atan" || call->func_name == "sqrt") {
+        OperNode* oper = new OperNode();
+        oper->oper_name = call->func_name;
+        oper->operands = call->params;
+        return oper;
+    }
+    if (call->func_name == "@frac") {
+        LiteralNode* lit = new LiteralNode();
+        LiteralNode* old = (LiteralNode*) call->params.front().get();
+        if (old->type != LITERAL) return nullptr;
+        lit->value = old->value;
+        return lit;
+    }
+    if (call->func_name == "@fixed16") {
+        LiteralNode* lit = new LiteralNode();
+        LiteralNode* whole = (LiteralNode*) call->params.front().get();
+        LiteralNode* frac = (LiteralNode*) call->params.back().get();
+        if (whole->type != LITERAL || frac->type != LITERAL) return nullptr;
+        lit->value = whole->value  &0xFFFF0000;
+        lit->value |= (frac->value >> 16) & 0xFFFF;
+        return lit;
+    } 
+     return nullptr;
+}
+
 ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(CallNode);
     READ_TEXT("call");
@@ -235,6 +279,11 @@ ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
         node->params.push_back(ASTsubtree(expr));
     }
     READ_OF_TYPE(CLOSEBRACE);
+    ASTNode* builtin = handle_builtins(node);
+    if (builtin) {
+        delete node;
+        node = (CallNode*) builtin; //Not acutally type valid, but we are returning it as an ancestor immediately.
+    } 
     SUCCEED_PARSE;
 }
         
@@ -317,11 +366,13 @@ ASTNode* parse_cond_branch(std::vector<token> &tokens, tokIter &it) {
   node->condition = ASTsubtree(expr);
   READ_TEXT("label");
   READ_OF_TYPE(VAR);
-  node->truelabel = it->text;
+  node->truelabel = current_function+it->text;
   READ_TEXT("label");
   READ_OF_TYPE(VAR);
-  node->falselabel = it->text;
+  node->falselabel = current_function+it->text;
   READ_OF_TYPE(ENDLINE);
+  current_block->succs.push_back(node->truelabel);
+  current_block->succs.push_back(node->falselabel);
   SUCCEED_PARSE;
 }
 ASTNode* parse_jump(std::vector<token> &tokens, tokIter &it) {
@@ -329,8 +380,9 @@ ASTNode* parse_jump(std::vector<token> &tokens, tokIter &it) {
   READ_TEXT("br");
   READ_TEXT("label");
   READ_OF_TYPE(VAR);
-  node->label = it->text;
+  node->label = current_function+it->text;
   READ_OF_TYPE(ENDLINE);
+  current_block->succs.push_back(node->label);
   SUCCEED_PARSE;
 }
 
@@ -363,12 +415,12 @@ ASTNode* parse_line(std::vector<token> &tokens, tokIter &it) {
 void parse_basic_block_header(std::vector<token> &tokens, tokIter &it, BasicBlockNode* bb) {
   auto old_it = it;
   it++;
-  bb->label = it->text;
+  bb->label = current_function + it->text;
   if (check_next_text(tokens,it,"preds")) it++;
   if (check_next(tokens,it,EQUALS)) it++;
   while (check_next(tokens,it,VAR)) {
     it++;
-    bb->preds.push_back(it->text);
+    bb->preds.push_back(current_function+it->text);
   }
   return;
 }
@@ -380,8 +432,8 @@ ASTNode* parse_block(std::vector<token> &tokens, tokIter &it) {
     line = parse_line(tokens,it);
     int num = 0;
     BasicBlockNode* basic_block = new BasicBlockNode();
-    basic_block->label = "%0";
-
+    basic_block->label = current_function + "%0";
+    current_block = basic_block;
     while (line) {
       if (PARSE_DEBUG) std::cerr << prefix << "BLOCK line " << ++num << std::endl;
       basic_block->lines.push_back(ASTsubtree(line));
@@ -389,6 +441,7 @@ ASTNode* parse_block(std::vector<token> &tokens, tokIter &it) {
         node->children.push_back(ASTsubtree(basic_block));
         basic_block = new BasicBlockNode();
         parse_basic_block_header(tokens,it,basic_block);
+        current_block = basic_block;
       } 
       line = parse_line(tokens,it);
     }
@@ -404,6 +457,7 @@ ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
     READ_TEXT("define");
     READ_OF_TYPE(IDENT);
     node->name = it->text;
+    current_function = it->text;
     
     READ_OF_TYPE(OPENBRACE);
     while (check_next(tokens,it,VAR)) {
@@ -441,6 +495,10 @@ ASTNode* parse(std::vector<token> &tokens) {
         }
     } else {
      it++;
+     if (it == tokens.end()) break;
+     it++;
+     if (it == tokens.end()) break;
+
     }
   }
   
