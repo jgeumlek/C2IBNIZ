@@ -10,6 +10,8 @@ cat <<EOF >tempfiles/phase1_prefixed.c
 int sqrt(int);
 int sin(int);
 int atan(int, int);
+int frac(double);
+int fixed16(int,int);
 EOF
 
 cat $1 >>tempfiles/phase1_prefixed.c

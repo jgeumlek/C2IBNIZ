@@ -235,12 +235,28 @@ public:
     std::string varname;
     virtual std::string to_string() { return "writevar_" + varname;};
 };
+
 class LiteralNode : public ASTNode {
 public:
     LiteralNode() : ASTNode(LITERAL) {};
     LiteralNode(int value) : ASTNode(LITERAL), value(value) {};
+    static std::string format(int value) {
+        if (value == 0) return "0";
+        int whole = (value >> 16) & 0x0000FFFF;
+        int frac = (value & 0x0000FFFF); 
+        size_t size = snprintf(nullptr,0,"%.4X.%.4X",whole,frac) + 1;
+        std::unique_ptr<char[]> buffer(new char[size]);
+        snprintf(buffer.get(),size,"%.4X.%.4X",whole,frac);
+        char* start = buffer.get();
+        char* end = buffer.get()+size-2;
+        while(*start == '0') start++;
+        while(*end == '0') end--;
+        if (*end != '.') end++;
+        return std::string(start,end);
+    }
+    std::string hexprint() { return format(value);};
     int value;
-    virtual std::string to_string() { return "lit_" + std::to_string(value);};
+    virtual std::string to_string() { return "lit_" + format(value);};
 };
 class AllocateNode : public ASTNode {
 public:

@@ -151,10 +151,18 @@ ASTNode* parse_literal(std::vector<token> &tokens, tokIter &it) {
   int value = 0;
   std::string text = it->text;
   try {
+       if (text != "double") throw 1;
+       if (!check_next(tokens,it,IDENT)) throw 1;
+       it++; text = it->text;
+       double dvalue = std::stod(text);
+       node->value = (int) (dvalue * (1 << 16));
+       SUCCEED_PARSE;
+  } catch(...) {};
+  try {
           value = std::stoi(text);
           //NOTE: above stoi has some quirks. "123abc" -> 123, even though there is text.
           //POSSIBLY DO SOME BOUNDS CHECKING?
-          node->value = value;
+          node->value = value<<16;
           SUCCEED_PARSE;
   } catch (...) {
     //stoi exception when it fails.
@@ -240,6 +248,23 @@ ASTNode* handle_builtins(CallNode* call) {
         oper->operands = call->params;
         return oper;
     }
+    if (call->func_name == "@frac") {
+        LiteralNode* lit = new LiteralNode();
+        LiteralNode* old = (LiteralNode*) call->params.front().get();
+        if (old->type != LITERAL) return nullptr;
+        lit->value = old->value;
+        return lit;
+    }
+    if (call->func_name == "@fixed16") {
+        LiteralNode* lit = new LiteralNode();
+        LiteralNode* whole = (LiteralNode*) call->params.front().get();
+        LiteralNode* frac = (LiteralNode*) call->params.back().get();
+        if (whole->type != LITERAL || frac->type != LITERAL) return nullptr;
+        lit->value = whole->value  &0xFFFF0000;
+        lit->value |= (frac->value >> 16) & 0xFFFF;
+        return lit;
+    } 
+     return nullptr;
 }
 
 ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
@@ -470,6 +495,10 @@ ASTNode* parse(std::vector<token> &tokens) {
         }
     } else {
      it++;
+     if (it == tokens.end()) break;
+     it++;
+     if (it == tokens.end()) break;
+
     }
   }
   
