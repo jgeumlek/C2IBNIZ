@@ -52,6 +52,11 @@ public:
    if (ast->type != ROOT) return;
    RootNode* root = (RootNode*) ast;
    heap_ptr = 0;
+   if (!root->data_segment.empty()) {
+     vars.insert(VarEntry("@DATA",{"@DATA",-1,heap_ptr}));
+     output += "0,0!";
+     heap_ptr += root->data_segment.size();
+   }
    for (auto func : root->subroutines) {
       translate_funcdef(func);
    }
@@ -59,6 +64,14 @@ public:
    auto it = vars.find("@ibniz_run%0");
    int loc = it->second.heap_addr;
    output += std::to_string(loc) + "V";
+   if (!root->data_segment.empty()) {
+     output += "$";
+     for (auto val : root->data_segment) {
+       std::unique_ptr<char[]> buffer(new char[9]);
+       snprintf(buffer.get(),9,"%.8X",val);
+       output += std::string(buffer.get(),buffer.get()+8);
+     }
+   }
   }
    
     
@@ -208,6 +221,15 @@ public:
     translate_call(ast);
     return;
   }
+  if (ast->type == LOAD) {
+    translate_load(ast);
+  }
+  }
+  void translate_load(ASTsubtree &ast) {
+  if (ast->type != LOAD) return;
+  LoadNode* load = (LoadNode*) ast.get();
+  translate_expr(load->address);
+  output += "@";
   }
   void translate_call(ASTsubtree &ast) {
   if (ast->type != CALL) return;
@@ -244,6 +266,7 @@ public:
   if (oper->oper_name == "and") output += "&";
   if (oper->oper_name == "sdiv") output += "/";
   if (oper->oper_name == "ashr") output += "r";
+  if (oper->oper_name == "lshr") output += "r";
   }
 
    
