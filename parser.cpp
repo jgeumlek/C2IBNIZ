@@ -56,7 +56,7 @@ void check_for_token(std::string &str, std::vector<token> &out) {
     std::string word = str;
     str.clear();
     if (word.empty()) return;
-    if (word.front() == '#') return;
+    if (word.front() == '#' || word.front() == '!') return;
     if (ignoreword(word)) return;
     
     if (!strncmp(word.c_str(),"<label>:",8)) {
@@ -66,7 +66,7 @@ void check_for_token(std::string &str, std::vector<token> &out) {
         out.push_back(token);
         return;
     }
-    if (word.front() == '%') {
+    if (word.front() == '%' || word.front() == '@') {
         out.push_back({VAR,word});
         return;
     }
@@ -87,22 +87,20 @@ void check_for_delim(char c, std::vector<token> &out) {
 
 void tokenize(std::istream &in, std::vector<token> &out) {
     std::string line;
-    bool seen_definition = false;
     while(!in.fail() && !in.eof()) {
         std::getline(in,line,'\n');
         std::string word;
         for (char c : line) {
             if (isDelim(c)) {
-                if (!seen_definition && word == "define") seen_definition = true;
-                if (!seen_definition) break;
                 if (word == "attributes") break;
+                if (word == "align") {word.clear();break;}
                 check_for_token(word,out);
                 check_for_delim(c,out);
             } else {
             if (c != '\n') word.push_back(c);
             }
         }
-        if (seen_definition) check_for_token(word,out);
+         check_for_token(word,out);
         out.push_back({ENDLINE,"\n"});
     }
 }
@@ -242,10 +240,12 @@ ASTNode* parse_phi(std::vector<token> &tokens, tokIter &it) {
 ASTNode* handle_builtins(CallNode* call) {
 /*This function translates function calls into operators,
   since IBNIZ provides a few for us*/
-    if (call->func_name == "sin" || call->func_name == "atan" || call->func_name == "sqrt") {
+    if (call->func_name == "@sin" || call->func_name == "@atan" || call->func_name == "@sqrt") {
         OperNode* oper = new OperNode();
         oper->oper_name = call->func_name;
         oper->operands = call->params;
+        //Remove the "@"
+        oper->oper_name.erase(oper->oper_name.begin());
         return oper;
     }
     if (call->func_name == "@frac") {
@@ -270,7 +270,7 @@ ASTNode* handle_builtins(CallNode* call) {
 ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(CallNode);
     READ_TEXT("call");
-    READ_OF_TYPE(IDENT);
+    READ_OF_TYPE(VAR);
     node->func_name = it->text;
     READ_OF_TYPE(OPENBRACE);
     while(!check_next(tokens,it,CLOSEBRACE)) {
@@ -285,6 +285,21 @@ ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
         node = (CallNode*) builtin; //Not acutally type valid, but we are returning it as an ancestor immediately.
     } 
     SUCCEED_PARSE;
+}
+ASTNode* parse_array_addr(std::vector<token> &tokens, tokIter &it) {
+  START_PARSE(OperNode);
+  node->oper_name = "add";
+  READ_TEXT("getelementptr");
+  while (!check_next_text(tokens,it,"*")) { it++; if (it == tokens.end()) FAIL_PARSE;};
+  it++;
+  ASTNode* expr = parse_expression(tokens,it);
+  if (!expr) PARSE_ERR("array addr not recognized?");
+  node->operands.push_back(ASTsubtree(expr));
+  it++;
+  expr = parse_expression(tokens,it);
+  if (!expr) PARSE_ERR("array offset not recognized?");
+  node->operands.push_back(ASTsubtree(expr));
+  SUCCEED_PARSE;
 }
         
 ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
@@ -311,7 +326,10 @@ ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
   if (check_next(tokens,it,VAR)) {
     return parse_read(tokens,it);
   }
-  
+  //check for an array access
+  if (check_next_text(tokens,it,"getelementptr")) {
+      return parse_array_addr(tokens,it);
+  }
   //try for a operation;
   expr = parse_operation(tokens,it);
   if (expr) return expr;
@@ -455,7 +473,7 @@ ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(FuncDefNode);
     
     READ_TEXT("define");
-    READ_OF_TYPE(IDENT);
+    READ_OF_TYPE(VAR);
     node->name = it->text;
     current_function = it->text;
     
@@ -479,20 +497,37 @@ std::string getFuncName(ASTNode* node) {
     FuncDefNode* def = (FuncDefNode*) node;
     return def->name;
 }
+void parse_data(std::vector<token> &tokens, tokIter &it, RootNode* root) {
+  if (it->text != "@DATA") return;
+  while ( it != tokens.end() && it->type != CLOSEBRACE) it++;
+  if (it == tokens.end()) return;
+  if (!check_next(tokens,it,OPENBRACE)) return;
+  it++;
+  while (check_next(tokens,it,IDENT)) {
+    it++;
+    try {
+      unsigned long int val = std::stol(it->text);
+      root->data_segment.push_back(val);
+    } catch(...) {};
+  }
+  return;
+}
+    
+
 ASTNode* parse(std::vector<token> &tokens) {
   tokens.insert(tokens.begin(),{ENDLINE,"DUMMY"});
   auto it = tokens.begin();
   RootNode* root = new RootNode();
   while (it != tokens.end()) {
-    while ( it != tokens.end() && !it->text.empty() && it->text != "define") it++;
+    while ( it != tokens.end() && !it->text.empty() && (it->text != "define" && it->type != VAR)) it++;
+    if (it->type == VAR && it->text == "@DATA") {parse_data(tokens,it,root); it++; continue;}
     ASTNode* func = parse_func_def(tokens,--it);
     if (func) {
         std::string name = getFuncName(func);
         if (name == "@ibniz_run") {
-            root->video_tyx = ASTsubtree(func);
-        } else {
-            root->subroutines.push_back(ASTsubtree(func));
-        }
+            root->video_tyx = func;
+        } 
+        root->subroutines.push_back(ASTsubtree(func));
     } else {
      it++;
      if (it == tokens.end()) break;

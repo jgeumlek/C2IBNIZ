@@ -34,19 +34,24 @@ public:
 class RootNode : public ASTNode {
 public:
     RootNode() : ASTNode(ROOT) {};
-    ASTsubtree video_tyx;
-    ASTsubtree video_t;
-    ASTsubtree audio;
+    std::vector<unsigned int> data_segment;
+    ASTNode* video_tyx;
+    ASTNode* video_t;
+    ASTNode* audio;
     std::vector<ASTsubtree> subroutines; 
     virtual std::string to_string() { 
       std::string text;
-      text = "\n====Our Main Func====\n";
-      text += video_tyx->to_string();
-      text += "\n=====End Main Func====\n";
       for (auto func : subroutines) {
         text  += "\n=========================\n";
         text += func->to_string();
         text += "\n=========================\n";
+      }
+      if (!data_segment.empty()) {
+        text += "\n=====DATA================\n";
+        for (auto val : data_segment) {
+          text += std::to_string(val) + ",";
+        }
+        text += "\n";
       }
       return text;
     };
