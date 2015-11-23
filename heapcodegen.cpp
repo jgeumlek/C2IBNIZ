@@ -23,6 +23,7 @@ public:
   
   int heap_ptr = 0;
   std::string output = "";
+  std::string func_name = "";
   
   bool isPhiLine(ASTsubtree &line) {
     if (line->type != ASSIGNMENT) return false;
@@ -50,23 +51,29 @@ public:
   void translate(ASTNode* ast) { 
    if (ast->type != ROOT) return;
    RootNode* root = (RootNode*) ast;
-   translate_funcdef(root->video_tyx);
+   heap_ptr = 0;
+   for (auto func : root->subroutines) {
+      translate_funcdef(func);
+   }
+   /*Ugly hard coding*/
+   auto it = vars.find("@ibniz_run%0");
+   int loc = it->second.heap_addr;
+   output += std::to_string(loc) + "V";
   }
    
     
   void translate_funcdef(ASTsubtree ast) {
    if (ast->type != FUNCTION_DEFINITION) return;
    FuncDefNode* func = (FuncDefNode*) ast.get();
-   if (func->name != "@ibniz_run") return;
-   std::string timevar = func->params.at(0);
-   std::string xvar = func->params.at(1);
-   std::string yvar = func->params.at(2);
-   vars.insert(VarEntry(timevar,{timevar,-1,0}));
-   vars.insert(VarEntry(xvar,{xvar,-1,2}));
-   vars.insert(VarEntry(yvar,{yvar,-1,1}));
-   heap_ptr = 3;
-   output = "2!1!0!";
-   //stack is now empty!
+   func_name = func->name;
+   std::string prefix;
+   for (auto param : func->params) {
+     /*form commands to store arguments on heap, pass it onto the first basic block*/
+     vars.insert(VarEntry(func_name+param,{func_name+param,-1,heap_ptr}));
+     prefix = std::to_string(heap_ptr) + "!" + prefix;
+     heap_ptr += 1;
+   }
+
    if (func->body->type == BLOCK) {
      BlockNode* body = (BlockNode*) func->body.get();
      //log all the basic blocks, allocate space.
@@ -91,29 +98,29 @@ public:
        }
      }
    }
-   translate_body(func->body);
+   translate_body(func->body, prefix);
   }
-  void translate_body(ASTsubtree &ast) {
+  void translate_body(ASTsubtree &ast, std::string &prefix) {
     if (ast->type != BLOCK) return;
     BlockNode* block = (BlockNode*) ast.get();
     for (auto it = block->children.begin(); it != block->children.end(); it++) {
-      translate_basic_block((*it));
+      translate_basic_block((*it),prefix);
     }
-    auto bb = (BasicBlockNode*) block->children.front().get();
-    auto head = vars.find(bb->label);
-    output += std::to_string(head->second.heap_addr) + "V";
 
   }
-  void translate_basic_block(ASTsubtree &ast) {
+  void translate_basic_block(ASTsubtree &ast, std::string &prefix) {
    if (ast->type != BASICBLOCK) return;
    BasicBlockNode* block = (BasicBlockNode*) (ast.get());
    auto addr = vars.find(block->label);
    output += std::to_string(addr->second.heap_addr);
    output += "{";
+   if (!prefix.empty()) {
+     output += prefix;
+     prefix.clear();
+   }
    for (auto it = block->lines.begin(); it != block->lines.end(); it++) {
      translate_line(*it);
    }
-   /*Optimization?: Close brace not needed if we are "jumping" away...*/
    output += "}";
   } 
   void translate_line(ASTsubtree &ast) {
@@ -164,11 +171,11 @@ public:
   if (ast->type != WRITE) return;
   WriteNode* write = (WriteNode*) ast.get();
   int loc = heap_ptr;
-  if (var_allocated(write->varname)) {
-    auto it = vars.find(write->varname);
+  if (var_allocated(func_name+write->varname)) {
+    auto it = vars.find(func_name+write->varname);
     loc = it->second.heap_addr;
   } else {
-    vars.insert(VarEntry(write->varname,{write->varname,-1,heap_ptr}));
+    vars.insert(VarEntry(func_name+write->varname,{func_name+write->varname,-1,heap_ptr}));
     heap_ptr += 1;
   }
   output += std::to_string(loc);
@@ -177,7 +184,7 @@ public:
   void translate_expr(ASTsubtree &ast) {
   if (ast->type == READ) {
     ReadNode* read = (ReadNode*) ast.get();
-    auto it = vars.find(read->varname);
+    auto it = vars.find(func_name+read->varname);
     int loc = it->second.heap_addr;
     output += std::to_string(loc);
     output += "@";
@@ -197,6 +204,22 @@ public:
     translate_operation(ast);
     return;
   }
+  if (ast->type == CALL) {
+    translate_call(ast);
+    return;
+  }
+  }
+  void translate_call(ASTsubtree &ast) {
+  if (ast->type != CALL) return;
+  CallNode* call = (CallNode*) ast.get();
+  for (auto param : call->params) {
+    translate_expr(param);
+  }
+  auto it = vars.find(call->func_name+"%0");
+  int loc = it->second.heap_addr;
+  output += std::to_string(loc);
+  output += "V";
+
   }
 
   void translate_operation(ASTsubtree &ast) {
