@@ -13,7 +13,7 @@ int rgb(int r, int g, int b) {
    return v | (u >> 8) | y;
 }
 
-int ibniz_run(int time,int x, int y) {
+int ibniz_video_tyx(int time,int y, int x) {
    //return rgb(1,0,1);
   time >>= 10;
   //return rgb((sin(x)+1)/2,(sin(y)+1)/2,(sin(time)+1)/2);
