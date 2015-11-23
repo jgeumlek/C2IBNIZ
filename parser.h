@@ -6,7 +6,9 @@
 #include <memory>
 #include <sstream>
 
-#define MAIN_FUNC "@ibniz_run"
+#define IBNIZ_VIDEO_TYX_NAME "@ibniz_video_tyx"
+#define IBNIZ_VIDEO_T_NAME   "@ibniz_video_t"
+#define IBNIZ_AUDIO_NAME     "@ibniz_audio"
 
 enum tokentype { IDENT, VAR, CONSTANT, EQUALS, OPENBRACE, CLOSEBRACE, ENDLINE,LABEL};
 struct token {
@@ -35,9 +37,9 @@ class RootNode : public ASTNode {
 public:
     RootNode() : ASTNode(ROOT) {};
     std::vector<unsigned int> data_segment;
-    ASTNode* video_tyx;
-    ASTNode* video_t;
-    ASTNode* audio;
+    std::string video_tyx_func;
+    std::string video_t_func;
+    std::string audio_func;
     std::vector<ASTsubtree> subroutines; 
     virtual std::string to_string() { 
       std::string text;

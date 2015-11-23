@@ -31,7 +31,7 @@ FAIL_PARSE;};\
 it++;} while(0);
 
 
-std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","ENDLINE","ENDLINE"};
+std::string tokentypenames[] = {"IDENT","VAR","CONSTANT","EQUALS","OPENBRACE","CLOSEBRACE","ENDLINE","LABEL"};
 std::string ASTtypenames[] = { "ROOT","FUNCTION_DEFINITION", "BLOCK", "ASSIGNMENT", "CALL", "OPERATION", "READ","WRITE", "STORE", "LOAD", "LITERAL","LOOP",  "RETURN", "NOOP", "ALLOCATE", "UNKNOWN","BASIC_BLOCK","PHI","JUMP","BRANCH", };
 
 //empty string dentes the end of this array
@@ -299,6 +299,7 @@ ASTNode* parse_array_addr(std::vector<token> &tokens, tokIter &it) {
   expr = parse_expression(tokens,it);
   if (!expr) PARSE_ERR("array offset not recognized?");
   node->operands.push_back(ASTsubtree(expr));
+  if (check_next(tokens,it,CLOSEBRACE)) it++;
   SUCCEED_PARSE;
 }
         
@@ -524,9 +525,15 @@ ASTNode* parse(std::vector<token> &tokens) {
     ASTNode* func = parse_func_def(tokens,--it);
     if (func) {
         std::string name = getFuncName(func);
-        if (name == "@ibniz_run") {
-            root->video_tyx = func;
+        if (name == IBNIZ_VIDEO_TYX_NAME) {
+            root->video_tyx_func = name;
         } 
+        if (name == IBNIZ_VIDEO_T_NAME) {
+            root->video_t_func = name;
+        }
+        if (name == IBNIZ_AUDIO_NAME) {
+            root->audio_func = name;
+        }
         root->subroutines.push_back(ASTsubtree(func));
     } else {
      it++;
