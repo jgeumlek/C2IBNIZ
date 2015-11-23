@@ -1,5 +1,5 @@
 
-int ibniz_run(const int time, const int x, const int y) {
+int ibniz_video_tyx(const int time, const int y, const int x) {
 
  return 2*sin(time/200) + (x^y) + (x%y);
 }

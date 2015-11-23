@@ -1,3 +1,3 @@
-int ibniz_run(int time, int x, int y) {
-  return ((atan(x,y) + (time>>8))<<3)^((time >> 6)+(2/sqrt(x*x+y*y)));
+int ibniz_video_tyx(int time, int y, int x) {
+  return ((atan(x,y) + (time>>8))<<3)^((time >> 6)+(frac(1)/sqrt(x*x+y*y)));
 }

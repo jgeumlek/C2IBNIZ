@@ -1,4 +1,4 @@
-int ibniz_run(int time, int x, int y) {
+int ibniz_video_tyx(int time, int y, int x) {
   int comb = (time^x^y);
-  return (comb*comb*comb);
+  return (comb*comb*comb) % frac(1);
 }
