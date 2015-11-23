@@ -17,9 +17,11 @@ int main(int argc, char** argv) {
     std::cerr << std::endl;
     
     ASTNode* ast = parse(tokens);
-    if (!ast) std::cerr << "PARSE FAILED" << std::endl;
+    if (ast->type != ROOT) exit (-5);
+    RootNode* root = (RootNode*) ast;
+    if (root->subroutines.empty()) std::cerr << "PARSE FAILED" << std::endl;
     
-    if (ast) std::cerr << "PARSE SUCCEEDED?" << std::endl;
+    if (!root->subroutines.empty()) std::cerr << "PARSE SUCCEEDED?" << std::endl;
     
     std::cerr << ast->to_string();
     
