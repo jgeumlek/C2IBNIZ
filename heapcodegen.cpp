@@ -60,10 +60,26 @@ public:
    for (auto func : root->subroutines) {
       translate_funcdef(func);
    }
-   /*Ugly hard coding*/
-   auto it = vars.find("@ibniz_run%0");
-   int loc = it->second.heap_addr;
-   output += std::to_string(loc) + "V";
+   std::string main_func = "";
+
+   if (!root->video_tyx_func.empty()) {
+       main_func = root->video_tyx_func;
+   }
+   if (!root->video_t_func.empty()) {
+       main_func = root->video_t_func;
+   }
+   if (!main_func.empty()) {
+      auto it = vars.find(main_func+"%0");
+      int loc = it->second.heap_addr;
+      output += std::to_string(loc) + "V";
+   }
+   if (!root->audio_func.empty()) {
+       if (!main_func.empty()) output += "M";
+       auto it = vars.find(root->audio_func+"%0");
+       int loc = it->second.heap_addr;
+       output += std::to_string(loc) + "V";
+   }
+
    if (!root->data_segment.empty()) {
      output += "$";
      for (auto val : root->data_segment) {
@@ -261,6 +277,7 @@ public:
   if (oper->oper_name == "srem") output += "%";
   if (oper->oper_name == "eq") output += "-=";
   if (oper->oper_name == "sgt") output += "->=";
+  if (oper->oper_name == "slt") output += "-<=";
   if (oper->oper_name == "xor") output += "^";
   if (oper->oper_name == "or") output += "|";
   if (oper->oper_name == "and") output += "&";
