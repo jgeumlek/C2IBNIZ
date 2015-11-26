@@ -1,5 +1,3 @@
-#ifndef C2I_PARSER_H
-#define C2I_PARSER_H
 #include <iostream>
 #include <vector>
 #include <string>
@@ -8,7 +6,7 @@
 
 #define MAIN_FUNC "@ibniz_run"
 
-enum tokentype { IDENT, VAR, CONSTANT, EQUALS, OPENBRACE, CLOSEBRACE, ENDLINE};
+enum tokentype { IDENT, VAR, CONSTANT, EQUALS, OPENBRACE, CLOSEBRACE, ENDLINE,LABEL};
 struct token {
     enum tokentype type;
     std::string text;
@@ -17,7 +15,7 @@ struct token {
 void tokenize(std::istream &in, std::vector<token> &out);
 
 //We might not end up supporting a lot of these...
-enum ASTtype { FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, IF_THEN_ELSE, RETURN, NOOP, ALLOCATE, UNKNOWN };
+enum ASTtype { FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, RETURN, NOOP, ALLOCATE, UNKNOWN,BASICBLOCK,PHI,JUMP,BRANCH };
 class ASTNode;
 typedef std::unique_ptr<ASTNode> ASTsubtree;
 ASTNode* parse(std::vector<token> &tokens);
@@ -54,17 +52,77 @@ class BlockNode : public ASTNode {
 public:
     BlockNode() : ASTNode(BLOCK) {};
     std::vector<ASTsubtree> children;
+    //The children are BasicBlockNodes.
     virtual std::string to_string() { 
       std::string text;
       text  = "\n{\n";
-      for (auto line = children.begin(); line != children.end(); line++) {
-        text += (*line)->to_string();
+      for (auto bb = children.begin(); bb != children.end(); bb++) {
+        text += (*bb)->to_string();
         text += ";\n";
       }
       text += "}\n";
       return text;
     };
 };
+class BasicBlockNode : public ASTNode {
+public:
+    BasicBlockNode() : ASTNode(BASICBLOCK) {};
+    std::vector<ASTsubtree> lines;
+    std::string label;
+    std::vector<std::string> preds;
+    virtual std::string to_string() { 
+      std::string text;
+      text  = "\n---- Basic Block ";
+      text += label + " ";
+      if (!preds.empty()) {
+        text += "(";
+        for (auto pred : preds) {
+          text+= pred + ",";
+        }
+        text += ")";
+      }
+      text += "----\n";
+      for (auto line = lines.begin(); line != lines.end(); line++) {
+        text += (*line)->to_string();
+        text += ";\n";
+      }
+      text += "---- End Block ----\n";
+      return text;
+    };
+};
+class BranchNode : public ASTNode {
+public:
+    BranchNode() : ASTNode(BRANCH) {};
+    ASTsubtree condition;
+    std::string truelabel;
+    std::string falselabel;
+    virtual std::string to_string() { return "if " + condition->to_string() + " then " + truelabel +" else "+ falselabel;};
+};
+
+class JumpNode : public ASTNode {
+public:
+    JumpNode() : ASTNode(JUMP) {};
+    std::string label;
+    virtual std::string to_string() { return "jump " + label;};
+};
+class PhiNode : public ASTNode {
+public:
+    PhiNode() : ASTNode(PHI) {};
+    std::vector<ASTsubtree> values;
+    std::vector<std::string> source_blocks;
+    virtual std::string to_string() { std::string text = "phi ";
+      for (int i = 0; i < values.size(); i++) {
+        text += "(";
+        text += (values.at(i))->to_string();
+        text += " from ";
+        text += source_blocks.at(i);
+        text += ")";
+      }
+      return text;
+    };
+};
+
+
 class AssignmentNode : public ASTNode {
 public:
     AssignmentNode() : ASTNode(ASSIGNMENT) {};
@@ -161,4 +219,4 @@ public:
     NOOPNode() : ASTNode(NOOP) {};
      virtual std::string to_string() { return "NO OP";};
 };
-#endif
+

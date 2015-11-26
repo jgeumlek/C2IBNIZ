@@ -15,13 +15,13 @@ EOF
 cat $1 >>tempfiles/phase1_prefixed.c
 
 #Use clang to get some LLVM IR
-clang -O3 -S -emit-llvm  tempfiles/phase1_prefixed.c -o tempfiles/phase2_llvm
+clang -S -O3 -emit-llvm  tempfiles/phase1_prefixed.c -o tempfiles/phase2_llvm
 
 #strip out only the ibniz_run function body. If we later support calling subroutines, we'll need to update this.
 awk '/ibniz_run/,/^}$/' tempfiles/phase2_llvm > tempfiles/phase3_body
 
 #reduce allocation statments, alignments, types, commas, builtin functions, add spaces around parens, ensure new lines are separate tokens
-sed -e 's/alloca/allocate/g' -e 's/align 4//g' -e 's/i32\*/at/g' -e 's/i32//g'  -e 's/,/ /g'  -re 's/tail?\s*call\s+@(sin|sqrt|atan)\(([^)]*)\)/ \1 \2/g' -e  's/([()])/ \1 /g' -e 's/#[0-9]+//g' -e 's/$/ /' <tempfiles/phase3_body >tempfiles/phase4_cleaned
+sed -e 's/alloca/allocate/g' -e 's/align 4//g' -e 's/i32\*/at/g' -e 's/i32//g'  -e 's/,/ /g'  -re 's/call\s+@(sin|sqrt|atan)\(([^)]*)\)/\1 \2/g' -e  's/([()])/ \1 /g' -e 's/#[0-9]+//g' -e 's/;//g' -e 's/$/ /' <tempfiles/phase3_body >tempfiles/phase4_cleaned
 
 #Run the now cleaned LLVM IR into our compiler.
 cat tempfiles/phase4_cleaned  | ./compiler

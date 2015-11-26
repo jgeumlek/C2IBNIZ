@@ -1,30 +1,32 @@
 #include "parser.h"
-
 #include "simplegen.cpp"
+
 int main(int argc, char** argv) {
     std::vector<token> tokens;
     tokenize(std::cin,tokens);
     for (auto token : tokens) {
-        if (token.type == IDENT) std::cout << "str_" << token.text;
-        if (token.type == OPENBRACE) std::cout << "OPEN";
-        if (token.type == CLOSEBRACE) std::cout << "CLOSE";
-        if (token.type == VAR) std::cout << "v_" << token.text;
-        if (token.type == EQUALS) std::cout << ":=";
-        if (token.type == ENDLINE) {std::cout << ";\n"; continue;}
-        std::cout << " ";
+        if (token.type == IDENT) std::cerr << "str_" << token.text;
+        if (token.type == OPENBRACE) std::cerr << "OPEN";
+        if (token.type == CLOSEBRACE) std::cerr << "CLOSE";
+        if (token.type == VAR) std::cerr << "v_" << token.text;
+        if (token.type == EQUALS) std::cerr << ":=";
+        if (token.type == ENDLINE) {std::cerr << ";\n"; continue;}
+        if (token.type == LABEL) {std::cerr << "LABEL" << token.text;}
+        std::cerr << " ";
     }
-    std::cout << std::endl;
+    std::cerr << std::endl;
     
     ASTNode* ast = parse(tokens);
-    if (!ast) std::cout << "PARSE FAILED" << std::endl;
+    if (!ast) std::cerr << "PARSE FAILED" << std::endl;
     
-    if (ast) std::cout << "PARSE SUCCEEDED?" << std::endl;
+    if (ast) std::cerr << "PARSE SUCCEEDED?" << std::endl;
     
-    std::cout << ast->to_string();
+    std::cerr << ast->to_string();
     
     simple_translator *trans = new simple_translator();
     trans->translate(ast);
-    std::cout << trans->output << std::endl;
-    if (ast) delete ast;
+    std::cout << trans->res->val << std::endl;
     delete trans;
+    if (ast) delete ast;
+	
 }
