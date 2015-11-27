@@ -70,6 +70,11 @@ void check_for_token(std::string &str, std::vector<token> &out) {
         out.push_back({VAR,word});
         return;
     }
+    if (word.back() == ':' ) {
+        word.pop_back();
+        out.push_back({LABEL,"%" + word});
+        return;
+    }
     if (word == "=") {
         out.push_back({EQUALS,word});
         return;

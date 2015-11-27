@@ -1,0 +1,18 @@
+int ibniz_video_tyx(int t, int y, int x) {
+  int wave = sin(t >> 12) << 1;
+  x*= wave;
+  y*= wave;
+  int i = 15;
+  x -= frac(.9);
+  y -= frac(.3);
+  int real = 0;
+  int imag = 0;
+  while (i > 0) {
+    int temp = real;
+    real = (real*real - imag*imag + x);
+    imag = (2*temp*imag + y);
+    if (real*real + imag*imag > frac(4)) return i * fixed16(0xE,0x5000);
+    i--;
+  }
+  return 0;
+} 
