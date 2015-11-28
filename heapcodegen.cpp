@@ -118,8 +118,8 @@ public:
      for (auto it = body->children.begin(); it != body->children.end(); it++) {
        if ((*it)->type == BASICBLOCK) {
          BasicBlockNode* bb = (BasicBlockNode*)(*it).get();
-         for (auto it2 = bb->lines.begin(); it2 != bb->lines.end(); it2++) {
-           if ((*it2)->type == NOOP) continue;
+         for (auto it2 = bb->lines.begin(); it2 != bb->lines.end();) {
+           if ((*it2)->type == NOOP) it2++;
            if (!isPhiLine(*it2)) break; //Phi nodes must come first.
            processPhiLine(*it2);
            bb->lines.erase(it2);
@@ -276,8 +276,8 @@ public:
   if (oper->oper_name == "sqrt") output += "q";
   if (oper->oper_name == "srem") output += "%";
   if (oper->oper_name == "eq") output += "-=";
-  if (oper->oper_name == "sgt") output += "->=";
-  if (oper->oper_name == "slt") output += "-<=";
+  if (oper->oper_name == "sgt") output += "->";
+  if (oper->oper_name == "slt") output += "-<";
   if (oper->oper_name == "xor") output += "^";
   if (oper->oper_name == "or") output += "|";
   if (oper->oper_name == "and") output += "&";
