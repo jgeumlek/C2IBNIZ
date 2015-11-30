@@ -58,7 +58,7 @@ void check_for_token(std::string &str, std::vector<token> &out) {
     if (word.empty()) return;
     if (word.front() == '#') return;
     if (ignoreword(word)) return;
-    
+
     if (!strncmp(word.c_str(),"<label>:",8)) {
         token token;
         token.type = LABEL;
@@ -82,8 +82,8 @@ void check_for_delim(char c, std::vector<token> &out) {
     if (c == '(' || c == '{' || c == '[') out.push_back({OPENBRACE,"{"});
     if (c == ')' || c == '}' || c == ']') out.push_back({CLOSEBRACE,"}"});
 }
-    
-    
+
+
 
 void tokenize(std::istream &in, std::vector<token> &out) {
     std::string line;
@@ -198,7 +198,7 @@ ASTNode* parse_operation(std::vector<token> &tokens, tokIter &it) {
   }
   SUCCEED_PARSE;
 }
-  
+
 
 ASTNode* parse_load(std::vector<token> &tokens, tokIter &it) {
   START_PARSE(LoadNode);
@@ -263,7 +263,7 @@ ASTNode* handle_builtins(CallNode* call) {
         lit->value = whole->value  &0xFFFF0000;
         lit->value |= (frac->value >> 16) & 0xFFFF;
         return lit;
-    } 
+    }
      return nullptr;
 }
 
@@ -283,10 +283,10 @@ ASTNode* parse_call(std::vector<token> &tokens, tokIter &it) {
     if (builtin) {
         delete node;
         node = (CallNode*) builtin; //Not acutally type valid, but we are returning it as an ancestor immediately.
-    } 
+    }
     SUCCEED_PARSE;
 }
-        
+
 ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
    if (PARSE_DEBUG)std::cerr<<prefix<<"Looking for an expr..." << std::endl;
   if (check_next(tokens,it,ENDLINE)) return nullptr;
@@ -311,7 +311,7 @@ ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
   if (check_next(tokens,it,VAR)) {
     return parse_read(tokens,it);
   }
-  
+
   //try for a operation;
   expr = parse_operation(tokens,it);
   if (expr) return expr;
@@ -321,14 +321,14 @@ ASTNode* parse_expression(std::vector<token> &tokens, tokIter &it) {
 
 ASTNode* parse_return(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(ReturnNode);
-    
+
     READ_TEXT("ret");
     ASTNode* expr = parse_expression(tokens,it);
     if (!expr) PARSE_ERR("return had no value?");
     node->value = ASTsubtree(expr);
     READ_OF_TYPE(ENDLINE);
-    SUCCEED_PARSE; 
-    
+    SUCCEED_PARSE;
+
 }
 
 ASTNode* parse_assignment(std::vector<token> &tokens, tokIter &it) {
@@ -345,7 +345,7 @@ ASTNode* parse_assignment(std::vector<token> &tokens, tokIter &it) {
 
 ASTNode* parse_store(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(StoreNode);
-    
+
     READ_TEXT("store");
     ASTNode* expr = parse_expression(tokens,it);
     if (!expr) PARSE_ERR("store had no value?");
@@ -408,7 +408,7 @@ ASTNode* parse_line(std::vector<token> &tokens, tokIter &it) {
    if (check_next_text(tokens,it,"store")) return parse_store(tokens,it);
    if (check_next_text(tokens,it,"ret")) return parse_return(tokens,it);
    if (check_next_text(tokens,it,"br")) return parse_branch(tokens,it);
-   
+
    return nullptr;
 }
 
@@ -442,32 +442,32 @@ ASTNode* parse_block(std::vector<token> &tokens, tokIter &it) {
         basic_block = new BasicBlockNode();
         parse_basic_block_header(tokens,it,basic_block);
         current_block = basic_block;
-      } 
+      }
       line = parse_line(tokens,it);
     }
     node->children.push_back(ASTsubtree(basic_block));
     READ_OF_TYPE(CLOSEBRACE);
     SUCCEED_PARSE;
-      
+
 }
 
 ASTNode* parse_func_def(std::vector<token> &tokens, tokIter &it) {
     START_PARSE(FuncDefNode);
-    
+
     READ_TEXT("define");
     READ_OF_TYPE(IDENT);
     node->name = it->text;
     current_function = it->text;
-    
+
     READ_OF_TYPE(OPENBRACE);
     while (check_next(tokens,it,VAR)) {
         it++;
         node->params.push_back(it->text);
     }
     READ_OF_TYPE(CLOSEBRACE);
-    
+
     if (!skipTo(tokens,it,OPENBRACE)) FAIL_PARSE;
-    
+
     it--;
     ASTNode* body = parse_block(tokens,it);
     if (!body) FAIL_PARSE;
@@ -501,6 +501,6 @@ ASTNode* parse(std::vector<token> &tokens) {
 
     }
   }
-  
+
   return root;
 }

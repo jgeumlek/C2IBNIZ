@@ -1,5 +1,10 @@
 #include "parser.h"
+#include "walk_ast.h"
 
+void *fx(ASTsubtree &ast, ASTsubtree &root, void *parm) {
+  if(ast.get()->type==ROOT) return NULL;
+  return (void *)(ast.get());
+}
 
 int main(int argc, char** argv) {
     std::vector<token> tokens;
@@ -15,13 +20,27 @@ int main(int argc, char** argv) {
         std::cerr << " ";
     }
     std::cerr << std::endl;
-    
+
     ASTNode* ast = parse(tokens);
     if (!ast) std::cerr << "PARSE FAILED" << std::endl;
-    
+
     if (ast) std::cerr << "PARSE SUCCEEDED?" << std::endl;
-    
-    std::cerr << ast->to_string();
-    
-    if (ast) delete ast;
+
+    // std::cerr << ast->to_string();
+    ASTsubtree ast2 = ASTsubtree(ast);
+    //structure_ast(ast2);
+    //ASTNode *out = get_basic_block_by_label(ast2.get(), "ibniz_run%0");
+
+    // ASTNode *out = (ASTNode *)(walk_ast(ast2, ast2, fx, NULL));
+    ASTNode *out = get_basic_block_by_label(ast2, "@ibniz_run%19");
+    // void *out = walk_ast(ast2, ast2, fx, NULL);
+    if(out != NULL) std::cerr << "FOUND NODE!" << std::endl << out->to_string();
+    else std::cerr << "DIDN'T FIND NODE!" << std::endl;
+
+    // if(ast) delete ast;
+    // std::cerr << ast2.get()->to_string();
+
+    // unsure how to free the smart pointer...
+    // if (ast) delete ast;
+    // if (ast2) delete ast2;
 }

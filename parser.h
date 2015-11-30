@@ -17,7 +17,7 @@ struct token {
 void tokenize(std::istream &in, std::vector<token> &out);
 
 //We might not end up supporting a lot of these...
-enum ASTtype { ROOT,FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, RETURN, NOOP, ALLOCATE, UNKNOWN,BASICBLOCK,PHI,JUMP,BRANCH};
+enum ASTtype { ROOT,FUNCTION_DEFINITION, BLOCK, ASSIGNMENT, CALL, OPERATION, READ,WRITE, STORE, LOAD, LITERAL,LOOP, RETURN, NOOP, ALLOCATE, UNKNOWN,BASICBLOCK,PHI,JUMP,BRANCH,IFTHEN,IFTHENELSE};
 class ASTNode;
 typedef std::shared_ptr<ASTNode> ASTsubtree;
 ASTNode* parse(std::vector<token> &tokens);
@@ -37,8 +37,8 @@ public:
     ASTsubtree video_tyx;
     ASTsubtree video_t;
     ASTsubtree audio;
-    std::vector<ASTsubtree> subroutines; 
-    virtual std::string to_string() { 
+    std::vector<ASTsubtree> subroutines;
+    virtual std::string to_string() {
       std::string text;
       text = "\n====Our Main Func====\n";
       text += video_tyx->to_string();
@@ -58,8 +58,8 @@ public:
     std::string name;
     std::vector<std::string> params;
     ASTsubtree body;
-    
-    virtual std::string to_string() { 
+
+    virtual std::string to_string() {
       std::string text;
       text  = "function " + name + "(";
       for (auto var: params) {
@@ -76,7 +76,7 @@ public:
     BlockNode() : ASTNode(BLOCK) {};
     std::vector<ASTsubtree> children;
     //The children are BasicBlockNodes.
-    virtual std::string to_string() { 
+    virtual std::string to_string() {
       std::string text;
       text  = "\n{\n";
       for (auto bb = children.begin(); bb != children.end(); bb++) {
@@ -95,7 +95,7 @@ public:
     std::vector<std::string> preds;
     std::vector<std::string> succs;
 
-    virtual std::string to_string() { 
+    virtual std::string to_string() {
       std::string text;
       text  = "\n---- Basic Block ";
       text += label + " ";
@@ -130,7 +130,28 @@ public:
     ASTsubtree condition;
     std::string truelabel;
     std::string falselabel;
-    virtual std::string to_string() { return "if " + condition->to_string() + " then " + truelabel +" else "+ falselabel;};
+    virtual std::string to_string() { return "cond jump on " + condition->to_string() + " to " + truelabel +" or "+ falselabel;};
+};
+
+class IfThenNode : public ASTNode {
+public:
+  IfThenNode() : ASTNode(IFTHEN) {};
+  ASTsubtree condition;
+  ASTsubtree truebranch; // conditionally executed code
+  ASTsubtree merged; // code following if statement
+  // TODO - format differently?
+  virtual std::string to_string() { return "if " + condition->to_string() + " then " + truebranch->to_string() + " endif\n" + merged->to_string();};
+};
+
+class IfThenElseNode : public ASTNode {
+public:
+  IfThenElseNode() : ASTNode(IFTHENELSE) {};
+  ASTsubtree condition;
+  ASTsubtree truebranch;
+  ASTsubtree falsebranch;
+  ASTsubtree merged; // code following if statement
+  // TODO - format differently
+  virtual std::string to_string() { return "if " + condition->to_string() + " then " + truebranch->to_string() + " else " + falsebranch->to_string() + " endif\n" + merged->to_string();}
 };
 
 class JumpNode : public ASTNode {
@@ -183,7 +204,7 @@ public:
     CallNode() : ASTNode(CALL) {};
     std::string func_name;
     std::vector<ASTsubtree> params;
-    virtual std::string to_string() { 
+    virtual std::string to_string() {
       std::string text;
       text  = "call " + func_name + "(";
       for (auto var : params) {
@@ -192,7 +213,7 @@ public:
       }
       text += ")";
       return text;
-          
+
     };
 
 };
@@ -202,7 +223,7 @@ public:
     OperNode() : ASTNode(OPERATION) {};
     std::string oper_name;
     std::vector<ASTsubtree> operands;
-    virtual std::string to_string() { 
+    virtual std::string to_string() {
       std::string text;
       text  = "oper_" + oper_name + " ";
       for (auto var = operands.begin(); var != operands.end(); var++) {
@@ -210,7 +231,7 @@ public:
         text += ",";
       }
       return text;
-          
+
     };
 };
 
@@ -243,7 +264,7 @@ public:
     static std::string format(int value) {
         if (value == 0) return "0";
         int whole = (value >> 16) & 0x0000FFFF;
-        int frac = (value & 0x0000FFFF); 
+        int frac = (value & 0x0000FFFF);
         size_t size = snprintf(nullptr,0,"%.4X.%.4X",whole,frac) + 1;
         std::unique_ptr<char[]> buffer(new char[size]);
         snprintf(buffer.get(),size,"%.4X.%.4X",whole,frac);

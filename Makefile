@@ -1,2 +1,2 @@
 all:
-	g++  -g -std=c++11 compiler.cpp parser.cpp -o compiler
+	g++  -g -std=c++11 compiler.cpp parser.cpp walk_ast.cpp -o compiler
