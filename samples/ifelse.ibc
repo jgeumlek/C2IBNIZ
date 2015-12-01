@@ -1,0 +1,8 @@
+
+int ibniz_run(int t, int x, int y) {
+  if (x > y) {
+    return (x^y)+sin(t/500);
+  } else {
+    return 0;
+  }
+}

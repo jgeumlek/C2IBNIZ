@@ -28,18 +28,21 @@ int main(int argc, char** argv) {
 
     // std::cerr << ast->to_string();
     ASTsubtree ast2 = ASTsubtree(ast);
-    //structure_ast(ast2);
+    std::cerr << ast2.get()->to_string();
+    std::cerr << "AFTER TRANSFORMATION:" << std::endl;
+    structure_ast(ast2); // experimental...
+    std::cerr << ast2.get()->to_string();
+    // structure_ast(ast2);
     //ASTNode *out = get_basic_block_by_label(ast2.get(), "ibniz_run%0");
 
     // ASTNode *out = (ASTNode *)(walk_ast(ast2, ast2, fx, NULL));
-    ASTNode *out = get_basic_block_by_label(ast2, "@ibniz_run%19");
+    //BasicBlockNode *out = get_basic_block_by_label(ast2, "@ibniz_run%19");
     // void *out = walk_ast(ast2, ast2, fx, NULL);
-    if(out != NULL) std::cerr << "FOUND NODE!" << std::endl << out->to_string();
-    else std::cerr << "DIDN'T FIND NODE!" << std::endl;
+    //if(out != NULL) std::cerr << "FOUND NODE!" << std::endl << out->to_string();
+    //else std::cerr << "DIDN'T FIND NODE!" << std::endl;
 
     // if(ast) delete ast;
-    // std::cerr << ast2.get()->to_string();
-
+    
     // unsure how to free the smart pointer...
     // if (ast) delete ast;
     // if (ast2) delete ast2;

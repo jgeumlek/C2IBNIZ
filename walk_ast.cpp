@@ -28,9 +28,76 @@ void *get_basic_block_by_label_sub(ASTsubtree &ast, ASTsubtree &root, void *parm
 // Look up a basic block in an AST by its label
 // Used to determine successor nodes when turning branches into ifs
 // MUST be called on a root node (probably not actually)
-ASTNode *get_basic_block_by_label(ASTsubtree &ast, std::string s) {
+BasicBlockNode *get_basic_block_by_label(ASTsubtree &ast, std::string s) {
   void *res = walk_ast(ast, ast, get_basic_block_by_label_sub, (void *)(s.c_str()));
-  return (ASTNode *)(res);
+  return (BasicBlockNode *)(res);
+}
+
+// mutates a BasicBlockNode, removing any jump to the provided label
+void remove_jumps_by_label(BasicBlockNode *bblock, std::string label) {
+  for(auto it = bblock->lines.begin(); it != bblock->lines.end(); ++it) {
+    if((*it).get()->type == JUMP) {
+      JumpNode *jn = (JumpNode *)(*it).get();
+      if(label.compare(jn->label) == 0) {
+        bblock->lines.erase(it);
+      }
+    }
+  }
+}
+
+void *structure_ast_sub(ASTsubtree &ast, ASTsubtree &root, void *parm) {
+  if(ast.get()->type == BRANCH) {
+    BranchNode *ast_c = (BranchNode *)ast.get();
+    BasicBlockNode *true_block =  get_basic_block_by_label(root, ast_c->truelabel);
+    BasicBlockNode *false_block = get_basic_block_by_label(root, ast_c->falselabel);
+
+    // current heuristic:
+    // branches must have only one predecessor
+    // branches must have only one immediate successor
+    // this is the if-then-else case
+    if(true_block->preds.size()  == 1 &&
+       false_block->preds.size() == 1 &&
+       true_block->succs.size()  == 1 &&
+       false_block->succs.size() == 1) {
+
+         std::string merge_label = true_block->succs.front();
+         // finally, successors must be the same
+         if(true_block->succs.front().compare(false_block->succs.front()) == 0) {
+           BasicBlockNode *merge_block = get_basic_block_by_label(root, merge_label);
+           IfThenElseNode *iten = new IfThenElseNode();
+           iten->condition = ast_c->condition;
+           remove_jumps_by_label(true_block, merge_label);
+           iten->truebranch = ASTsubtree(true_block);
+           remove_jumps_by_label(false_block, merge_label);
+           iten->falsebranch = ASTsubtree(false_block);
+           iten->merged = ASTsubtree(merge_block);
+           ast = ASTsubtree(iten);
+         }
+    }
+    // if-else case
+    else if(true_block->preds.size() == 1 &&
+            false_block->preds.size() == 2 &&
+            true_block->succs.size() == 1) {
+
+              std::string merge_label = true_block->succs.front();
+              if(merge_label.compare(false_block->label) == 0) {
+                BasicBlockNode *merge_block = get_basic_block_by_label(root, merge_label);
+                IfThenNode *itn = new IfThenNode();
+                itn->condition = ast_c->condition;
+                remove_jumps_by_label(true_block, merge_label);
+                itn->truebranch = ASTsubtree(true_block);
+                itn->merged = ASTsubtree(false_block);
+                ast = ASTsubtree(itn);
+              }
+    }
+
+  }
+  return NULL;
+}
+
+// convert the AST so that it uses if statements where possible
+void *structure_ast(ASTsubtree &ast) {
+  return walk_ast(ast, ast, structure_ast_sub, NULL);
 }
 
 // subfunctions for each node type (to avoid polluting namespace
