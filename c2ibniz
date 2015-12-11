@@ -28,4 +28,4 @@ cat tempfiles/phase2_llvm >tempfiles/phase3_body
 sed -e 's/alloca/allocate/g' -e 's/align 4//g' -e 's/i32\*/at/g' -e 's/i32//g'  <tempfiles/phase3_body >tempfiles/phase4_cleaned
 
 #Run the now cleaned LLVM IR into our compiler.
-cat tempfiles/phase4_cleaned  | ./compiler
+cat tempfiles/phase4_cleaned  | ./compiler 2> /dev/null
