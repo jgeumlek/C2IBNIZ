@@ -22,13 +22,15 @@ A valid IBC file consists of the C language restricted to minimal arithmetic ope
 
 In the case both video functions are defined, `ibniz_video_t` takes priority.
 
+The three follow the media contexts of IBNIZ: `audio` generates a sample given the time, `video_tyx` generates a pixel given time and screen coordinates, and `video_t` generates a pixel given all three values packed in one.
+
 The user is allowed to define one global array of unsigned ints named `DATA[]`. This is the only global/heap based storage allowed by C2IBNIZ.
 
 The only variable type allowed is signed `int`. Since IBNIZ works on 16.16 fixed point numbers, two functions are allowed to specify literals in the code.
 
-   frac(double) \\convert a double to 16.16
-   fixed16(int,int) \\treat the first arg as the upper 16 bits, the second as the lower 16 bits
-                    \\(Recall: Upper sixteen represent whole number, Lower 16 represent fractional)
+    frac(double) \\convert a double to 16.16
+    fixed16(int,int) \\treat the first arg as the upper 16 bits, the second as the lower 16 bits
+                     \\(Recall: Upper sixteen represent whole number, Lower 16 represent fractional)
 
 Note that these are only allowed for literals in the code (especially since `double` variables are forbidden).
 
