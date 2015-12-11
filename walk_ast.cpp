@@ -47,7 +47,7 @@ void remove_jumps_by_label(BasicBlockNode *bblock, std::string label) {
     if(node.get()->type == JUMP) {
       JumpNode *jn = (JumpNode *)(node.get());
       if(label.compare(jn->label) == 0) {
-        std::cout << "Removed jump to " << label << "\n";
+        //std::cout << "Removed jump to " << label << "\n";
         return true;
       }
     }
@@ -63,7 +63,7 @@ void *remove_restructured_basic_block_sub(ASTsubtree &ast, ASTsubtree &root, voi
     if(node.get()->type == BASICBLOCK) {
       auto curr_c = (BasicBlockNode *)(node.get());
       if(strcmp(s, curr_c->label.c_str()) == 0) {
-        std::cout << "Did it. To label " << std::string(s) << "\n";
+        //std::cout << "Did it. To label " << std::string(s) << "\n";
         return true;
       }
     }
@@ -76,7 +76,7 @@ void *remove_restructured_basic_block_sub(ASTsubtree &ast, ASTsubtree &root, voi
     int priorsize = children.size();
     children.erase(std::remove_if(children.begin(), children.end(), pred), children.end());
     if(children.size() != priorsize) {
-      std::cout << "Size changed. At label " << std::string(s) << "\n";
+      //std::cout << "Size changed. At label " << std::string(s) << "\n";
     }
   }
 }
