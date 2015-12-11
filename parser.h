@@ -151,7 +151,11 @@ public:
   ASTsubtree falsebranch;
   ASTsubtree merged; // code following if statement
   // TODO - format differently
-  virtual std::string to_string() { return "if " + condition->to_string() + " then " + truebranch->to_string() + " else " + falsebranch->to_string() + " endif\n" + merged->to_string();}
+  virtual std::string to_string() { return "if " +
+    condition->to_string() + " then " + 
+    truebranch->to_string() + " else " +
+    falsebranch->to_string() + " endif\n" +
+    merged->to_string();}
 };
 
 class JumpNode : public ASTNode {

@@ -3,6 +3,13 @@
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <algorithm>
+
+// TODO consolidate blocks in a line
+// TODO while loop detection
+// TODO reaching defs?
+// TODO phi hoisting
+// TODO function for creating label-block map
 
 // Utility functions for transforming ASTs.
 
@@ -15,7 +22,7 @@ void *get_basic_block_by_label_sub(ASTsubtree &ast, ASTsubtree &root, void *parm
   if (ast.get()->type == BASICBLOCK) {
     auto ast_c = (BasicBlockNode *)(ast.get());
     if(strcmp(s, ast_c->label.c_str()) == 0) {
-      return (void *)(ast.get());
+      return (void *)&ast;
     }
     else {
       return NULL;
@@ -28,28 +35,67 @@ void *get_basic_block_by_label_sub(ASTsubtree &ast, ASTsubtree &root, void *parm
 // Look up a basic block in an AST by its label
 // Used to determine successor nodes when turning branches into ifs
 // MUST be called on a root node (probably not actually)
-BasicBlockNode *get_basic_block_by_label(ASTsubtree &ast, std::string s) {
+ASTsubtree * get_basic_block_by_label(ASTsubtree &ast, std::string s) {
   void *res = walk_ast(ast, ast, get_basic_block_by_label_sub, (void *)(s.c_str()));
-  return (BasicBlockNode *)(res);
+  return (ASTsubtree *)(res);
 }
 
 // mutates a BasicBlockNode, removing any jump to the provided label
 void remove_jumps_by_label(BasicBlockNode *bblock, std::string label) {
-  for(auto it = bblock->lines.begin(); it != bblock->lines.end(); ++it) {
-    if((*it).get()->type == JUMP) {
-      JumpNode *jn = (JumpNode *)(*it).get();
+  auto lines = bblock->lines;
+  auto pred = [label](const ASTsubtree &node) {
+    if(node.get()->type == JUMP) {
+      JumpNode *jn = (JumpNode *)(node.get());
       if(label.compare(jn->label) == 0) {
-        bblock->lines.erase(it);
+        std::cout << "Removed jump to " << label << "\n";
+        return true;
       }
     }
+    return false;
+  };
+  lines.erase( std::remove_if( lines.begin(), lines.end(), pred), lines.end() );
+}
+
+void *remove_restructured_basic_block_sub(ASTsubtree &ast, ASTsubtree &root, void *parm) {
+  const char *s = (const char *)(parm);
+
+  auto pred = [s](const ASTsubtree &node) {
+    if(node.get()->type == BASICBLOCK) {
+      auto curr_c = (BasicBlockNode *)(node.get());
+      if(strcmp(s, curr_c->label.c_str()) == 0) {
+        std::cout << "Did it. To label " << std::string(s) << "\n";
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if(ast.get()->type == BLOCK) {
+    auto ast_c = (BlockNode *)(ast.get());
+    auto children = ast_c->children;
+    int priorsize = children.size();
+    children.erase(std::remove_if(children.begin(), children.end(), pred), children.end());
+    if(children.size() != priorsize) {
+      std::cout << "Size changed. At label " << std::string(s) << "\n";
+    }
   }
+}
+
+// removes the given block but only if it's a direct descendant of a Block node
+void *remove_restructured_basic_block(std::string label, ASTsubtree &root) {
+  void *res = walk_ast(root, root, remove_restructured_basic_block_sub, (void *)(label.c_str()));
+  return res;
 }
 
 void *structure_ast_sub(ASTsubtree &ast, ASTsubtree &root, void *parm) {
   if(ast.get()->type == BRANCH) {
     BranchNode *ast_c = (BranchNode *)ast.get();
-    BasicBlockNode *true_block =  get_basic_block_by_label(root, ast_c->truelabel);
-    BasicBlockNode *false_block = get_basic_block_by_label(root, ast_c->falselabel);
+    ASTsubtree *true_block_s = get_basic_block_by_label(root, ast_c->truelabel);
+    BasicBlockNode *true_block = (BasicBlockNode *)true_block_s->get();
+    ASTsubtree *false_block_s = get_basic_block_by_label(root, ast_c->falselabel);
+    BasicBlockNode *false_block = (BasicBlockNode *)false_block_s->get();
+    std::string truelabel = ast_c->truelabel;
+    std::string falselabel = ast_c->falselabel;
 
     // current heuristic:
     // branches must have only one predecessor
@@ -60,33 +106,55 @@ void *structure_ast_sub(ASTsubtree &ast, ASTsubtree &root, void *parm) {
        true_block->succs.size()  == 1 &&
        false_block->succs.size() == 1) {
 
-         std::string merge_label = true_block->succs.front();
+         std::string mergelabel = true_block->succs.front();
          // finally, successors must be the same
          if(true_block->succs.front().compare(false_block->succs.front()) == 0) {
-           BasicBlockNode *merge_block = get_basic_block_by_label(root, merge_label);
+           ASTsubtree *merge_block_s = get_basic_block_by_label(root, mergelabel);
+           BasicBlockNode *merge_block = (BasicBlockNode *)merge_block_s->get();
            IfThenElseNode *iten = new IfThenElseNode();
            iten->condition = ast_c->condition;
-           remove_jumps_by_label(true_block, merge_label);
-           iten->truebranch = ASTsubtree(true_block);
-           remove_jumps_by_label(false_block, merge_label);
-           iten->falsebranch = ASTsubtree(false_block);
-           iten->merged = ASTsubtree(merge_block);
+
+           remove_jumps_by_label(true_block, mergelabel);
+           true_block->preds.clear();
+           true_block->succs.clear();
+           iten->truebranch = ASTsubtree(*true_block_s);
+           remove_restructured_basic_block(truelabel, root);
+
+           remove_jumps_by_label(false_block, mergelabel);
+           false_block->preds.clear();
+           false_block->succs.clear();
+           iten->falsebranch = ASTsubtree(*false_block_s);
+           remove_restructured_basic_block(falselabel, root);
+
+           merge_block->preds.clear();
+           iten->merged = ASTsubtree(*merge_block_s);
+           remove_restructured_basic_block(mergelabel, root);
+
            ast = ASTsubtree(iten);
          }
     }
-    // if-else case
+    // if-then case
     else if(true_block->preds.size() == 1 &&
             false_block->preds.size() == 2 &&
             true_block->succs.size() == 1) {
 
-              std::string merge_label = true_block->succs.front();
-              if(merge_label.compare(false_block->label) == 0) {
-                BasicBlockNode *merge_block = get_basic_block_by_label(root, merge_label);
+              std::string mergelabel = true_block->succs.front();
+              if(mergelabel.compare(false_block->label) == 0) {
+                ASTsubtree *merge_block_s = get_basic_block_by_label(root, mergelabel);
+                BasicBlockNode *merge_block = (BasicBlockNode *)merge_block_s->get();
                 IfThenNode *itn = new IfThenNode();
                 itn->condition = ast_c->condition;
-                remove_jumps_by_label(true_block, merge_label);
-                itn->truebranch = ASTsubtree(true_block);
-                itn->merged = ASTsubtree(false_block);
+
+                itn->truebranch = ASTsubtree(*true_block_s);
+                remove_jumps_by_label(true_block, mergelabel);
+                true_block->preds.clear();
+                true_block->succs.clear();
+                remove_restructured_basic_block(truelabel, root);
+
+                itn->merged = ASTsubtree(*false_block_s);
+                merge_block->preds.clear();
+                remove_restructured_basic_block(mergelabel, root);
+
                 ast = ASTsubtree(itn);
               }
     }

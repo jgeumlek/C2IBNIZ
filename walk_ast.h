@@ -19,9 +19,7 @@ typedef void * (*walk_fun)(ASTsubtree &, ASTsubtree &, void *);
 void *walk_ast(ASTsubtree &ast, ASTsubtree &root, walk_fun f, void *parm);
 
 // get a basic block out of an AST that has the given label
-BasicBlockNode *get_basic_block_by_label(ASTsubtree &ast, std::string s);
-
-ASTNode *get_first_thing(ASTsubtree &ast);
+ASTsubtree *get_basic_block_by_label(ASTsubtree &ast, std::string s);
 
 // convert the given AST so that it uses if statements where possible
 void *structure_ast(ASTsubtree &ast);
